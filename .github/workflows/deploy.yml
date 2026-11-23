@@ -1,0 +1,104 @@
+name: Deploy
+
+# Every push to main: check, then deploy the app (GitHub Pages) and the Worker
+# (Cloudflare), then smoke-test the deployed Worker. Can also be started by hand.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: App opens offline (real Chrome)
+        run: npm run e2e
+      - name: Frontend size
+        run: |
+          size=$(cat app/dist/assets/*.js | gzip -9 | wc -c)
+          echo "Frontend JavaScript: $size bytes gzipped (budget 80000)" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$size" -lt 80000
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: app/dist
+          include-hidden-files: true
+
+  deploy-app:
+    name: Deploy app (GitHub Pages)
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+      - run: echo "App → ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-worker:
+    name: Deploy Worker (Cloudflare)
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APP_TOKEN: ${{ secrets.APP_TOKEN }}
+    steps:
+      - name: Are the required secrets set?
+        run: |
+          missing=""
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          [ -n "$APP_TOKEN" ] || missing="$missing APP_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing. Follow docs/SETUP.md, then re-run this workflow."
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Find or create the D1 database
+        id: cloudflare
+        run: node scripts/ensure-d1.mjs
+      - name: Apply D1 migrations
+        working-directory: worker
+        run: npx wrangler d1 migrations apply unforget --remote
+      - name: Deploy Worker
+        working-directory: worker
+        run: npx wrangler deploy --var "VERSION:${GITHUB_SHA::7}"
+      - name: Copy secrets to the Worker
+        working-directory: worker
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: node ../scripts/worker-secrets.mjs | npx wrangler secret bulk
+      - name: Smoke test
+        env:
+          WORKER_URL: ${{ steps.cloudflare.outputs.worker_url }}
+        run: EXPECT_VERSION="${GITHUB_SHA::7}" node scripts/smoke.mjs
+      - run: echo "Worker → ${{ steps.cloudflare.outputs.worker_url }}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,24 @@
+// Cloudflare Worker config. Deployed only from GitHub Actions (.github/workflows/deploy.yml).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "unforget",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    // Browser origins allowed by CORS, comma-separated. Add more for a native app later.
+    "ALLOWED_ORIGINS": "https://jessezwienenberg.github.io"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "unforget",
+      // Placeholder: scripts/ensure-d1.mjs finds (or creates) the database at deploy
+      // time and writes the real id here in the CI checkout. Never committed.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
