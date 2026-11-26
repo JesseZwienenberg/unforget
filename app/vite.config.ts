@@ -1,4 +1,5 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import { finalizeServiceWorker } from './build/precache.ts';
 
@@ -24,6 +25,7 @@ function serviceWorkerPrecache(): Plugin {
 export default defineConfig({
   base: BASE,
   plugins: [svelte(), serviceWorkerPrecache()],
+  resolve: { alias: { $shared: fileURLToPath(new URL('../shared/src', import.meta.url)) } },
   define: {
     __BUILD_ID__: JSON.stringify((process.env.GITHUB_SHA ?? 'dev').slice(0, 7)),
   },

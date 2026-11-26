@@ -1,6 +1,25 @@
 import { isAuthorized } from './auth';
 import type { Env } from './env';
 import { corsHeaders, json, withHeaders } from './http';
+import { sync } from './sync';
+import { parseSyncRequest } from '../../shared/src/validate';
+
+const MAX_BODY_BYTES = 2_000_000;
+
+async function handleSync(request: Request, env: Env): Promise<Response> {
+  const text = await request.text();
+  if (text.length > MAX_BODY_BYTES) return json({ error: 'too_large' }, 413);
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return json({ error: 'invalid json' }, 400);
+  }
+  const now = new Date();
+  const parsed = parseSyncRequest(body, now);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  return json(await sync(env.DB, parsed.value, now));
+}
 
 async function health(env: Env): Promise<Response> {
   let schema: string | null = null;
@@ -34,6 +53,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (!(await isAuthorized(request, env))) return json({ error: 'unauthorized' }, 401);
 
   if (url.pathname === '/v1/ping' && request.method === 'GET') return json({ ok: true });
+  if (url.pathname === '/v1/sync' && request.method === 'POST') return handleSync(request, env);
 
   return json({ error: 'not_found' }, 404);
 }

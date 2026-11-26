@@ -51,6 +51,15 @@ if (!health) {
 
   const authed = await fetch(`${base}/v1/ping`, { headers: { authorization: `Bearer ${token}` } });
   check('requests with the token get 200', authed.status === 200, `status ${authed.status}`);
+
+  // An empty sync reads the real tables without writing anything.
+  const synced = await fetch(`${base}/v1/sync`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', origin },
+    body: JSON.stringify({ since: Number.MAX_SAFE_INTEGER }),
+  });
+  const syncBody = await synced.json().catch(() => null);
+  check('sync endpoint answers', synced.status === 200 && Number.isInteger(syncBody?.cursor), `status ${synced.status}`);
 }
 
 if (failures.length) {

@@ -2,30 +2,30 @@
 
 ## Done
 
-Nothing accepted yet.
+- **M0 – Bootstrap** (accepted 26 Nov 2026): repo, CI, deploys, installable offline placeholder, Worker health endpoint. Phone test passed.
 
 ## In progress
 
-**M0 – Bootstrap**: built and pushed; waiting for the one-time setup (docs/SETUP.md) and
-the phone test.
+**M1 – Capture**: built and deployed; waiting for Jesse's phone test.
 
 What exists:
-- Repo structure (`app/`, `worker/`, `scripts/`, `docs/`), npm workspaces.
-- Placeholder PWA: installable, precaching service worker scoped to `/unforget/`, status screen.
-- Worker: public `/health` (checks D1), token-protected `/v1/ping`, CORS allow list.
-- D1 migration `0001_init.sql` (a `meta` table only).
-- One workflow, `.github/workflows/deploy.yml`: checks, offline e2e, size budget, Pages
-  deploy, D1 find-or-create, migrations, Worker deploy, secrets copy, smoke test.
-- Secrets generated and shown to Jesse once in chat: `APP_TOKEN`, `VAPID_PUBLIC_KEY`,
-  `VAPID_PRIVATE_KEY`.
+- `shared/`: types, settings defaults, device parser (prefixes + relative times, NL/EN), time-zone helpers, last-write-wins merge, sync validation.
+- Worker: `POST /v1/sync` (LWW upserts in SQL, `rev` cursor, paging), migration `0002_sync.sql` (captures, items, settings, sync_state).
+- App: capture box docked at the bottom, tabs (Today / Work / Personal / Groceries), toast with tap-to-fix and Undo, edit sheet, IndexedDB via Dexie behind `Storage`, outbox + sync, setup link, share target, export, sync status + More sheet.
+- Tests: 178 unit tests; two Chrome end-to-end tests (offline shell; full capture → sync → second device flow against a local Worker).
+
+Live addresses:
+- App: https://jessezwienenberg.github.io/unforget/
+- Worker: https://unforget.jessez1997.workers.dev
 
 ## Exact next step
 
-1. Jesse finishes docs/SETUP.md and runs the Deploy workflow; fix whatever is red.
-2. Jesse does the M0 phone test (install from Chrome, open in airplane mode).
-3. On his OK: mark M0 done here and start M1 (capture). First M1 task: design the D1 schema
-   and the Dexie stores behind the storage interface, then the capture box.
+1. Jesse runs the M1 phone test (setup link, offline capture, laptop, share, export) and reports back, in particular whether the keyboard opens by itself when the app starts.
+2. Fix whatever he reports.
+3. On his OK: mark M1 done here and start M2 (reminders). First M2 tasks: pick a Web Push library that runs on Workers (WebCrypto), add `push_subscriptions` migration, subscribe flow in the app, per-minute cron with `notifiedAt`, notification buttons in the service worker.
 
 ## Known issues
 
-- None known. The Cloudflare half of the workflow has not run yet (needs the secrets).
+- Whether Android opens the keyboard automatically on launch is untested (cannot be checked off-device).
+- An already-installed app picks up the share target only after Chrome refreshes the install (up to a day) or after reinstalling.
+- No "not scheduled yet: offline" warning yet: it arrives with reminders in M2. Reminder times are stored and shown, but nothing notifies until M2.

@@ -37,9 +37,10 @@ The D1 database needs no manual step: the deploy workflow creates it the first t
 1. In Cloudflare, click the person icon (top right) → **My Profile** → **API Tokens** →
    **Create Token**.
 2. Next to **Edit Cloudflare Workers**, click **Use template**.
-3. Under **Permissions**, click **+ Add more** and add: **Account** · **D1** · **Edit**.
-4. Under **Account Resources**: **Include** · your account.
-   Under **Zone Resources**: **Include** · **All zones**.
+3. Add one extra permission: **D1** with **Write** (older screens call this **Account** ·
+   **D1** · **Edit**).
+4. The account should read **Entire … Account**. If the screen asks for **Zone Resources**,
+   choose **Include** · **All zones**; if it doesn't ask, skip it.
 5. **Continue to summary** → **Create Token**. Copy the token (it is shown once).
 6. Add it in GitHub as the secret **`CLOUDFLARE_API_TOKEN`**.
 
@@ -81,6 +82,16 @@ If a step is red, click it, copy the red error line and paste it to Claude.
 3. **Name**: exactly as in the table (capitals and underscores). **Secret**: the value, with
    no spaces or line breaks around it.
 4. **Add secret**.
+
+## Connecting a device (from M1)
+
+Open this link once in Chrome on each device, with your `APP_TOKEN` in place of `<APP_TOKEN>`:
+
+```
+https://jessezwienenberg.github.io/unforget/#setup=<APP_TOKEN>&api=https://unforget.jessez1997.workers.dev
+```
+
+The status in the top right changes from "Not connected" to a green dot.
 
 ## Rotating the app token
 

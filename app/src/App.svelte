@@ -1,138 +1,365 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { isInstalled, registerServiceWorker, requestPersistentStorage, type ShellStatus } from './lib/pwa';
+  import { LIST_NAMES } from '$shared/types';
+  import CaptureBar from './components/CaptureBar.svelte';
+  import EditForm from './components/EditForm.svelte';
+  import ItemRow from './components/ItemRow.svelte';
+  import More from './components/More.svelte';
+  import Sheet from './components/Sheet.svelte';
+  import { app, type Tab } from './lib/app.svelte';
+  import { groceryLabel, groceryView, listItems, todayView } from './lib/views';
 
-  let shell = $state<ShellStatus>('installing');
-  let online = $state(navigator.onLine);
-  let installed = $state(isInstalled());
-  let persistent = $state<boolean | null>(null);
+  void app.start();
 
-  const shellText: Record<ShellStatus, string> = {
-    installing: 'Saving the app for offline use…',
-    ready: 'Ready to open offline',
-    failed: 'Offline setup failed. Reload to try again',
-    unsupported: 'This browser cannot run the app offline',
-  };
+  const TABS: { id: Tab; name: string }[] = [
+    { id: 'today', name: 'Today' },
+    { id: 'work', name: LIST_NAMES.work },
+    { id: 'personal', name: LIST_NAMES.personal },
+    { id: 'groceries', name: LIST_NAMES.groceries },
+  ];
 
-  onMount(() => {
-    void registerServiceWorker((s) => (shell = s));
-    void requestPersistentStorage().then((p) => (persistent = p));
-    const mq = window.matchMedia('(display-mode: standalone)');
-    const onMode = () => (installed = mq.matches);
-    mq.addEventListener('change', onMode);
-    return () => mq.removeEventListener('change', onMode);
+  const today = $derived(todayView(app.items, app.now, app.timeZone));
+  const todayCount = $derived(today.overdue.length + today.today.length);
+  const groceries = $derived(groceryView(app.items, app.settings));
+  const list = $derived(app.tab === 'work' || app.tab === 'personal' ? listItems(app.items, app.tab) : []);
+
+  // Short status next to the title. Says nothing when all is well.
+  const status = $derived.by(() => {
+    const waiting = app.waiting > 0 ? ` · ${app.waiting} waiting` : '';
+    switch (app.syncState) {
+      case 'unconfigured':
+        return { tone: 'warn', text: 'Not connected' };
+      case 'unauthorized':
+        return { tone: 'bad', text: 'Reconnect needed' };
+      case 'offline':
+        return { tone: 'warn', text: `Offline${waiting}` };
+      case 'error':
+        return { tone: 'bad', text: `Sync problem${waiting}` };
+      default:
+        return { tone: app.updateReady ? 'warn' : 'ok', text: app.updateReady ? 'Update ready' : '' };
+    }
   });
 </script>
 
-<svelte:window ononline={() => (online = true)} onoffline={() => (online = false)} />
-
-<main>
+<div class="shell">
   <header>
-    <img src="{import.meta.env.BASE_URL}icons/icon.svg" alt="" width="56" height="56" />
-    <h1>Unforget</h1>
-    <p class="lede">The app is set up. Capture arrives in the next milestone.</p>
+    <h1>{TABS.find((t) => t.id === app.tab)?.name}</h1>
+    <button type="button" class="status {status.tone}" class:busy={app.syncState === 'syncing'} data-sync={app.syncState} data-waiting={app.waiting} aria-label="Sync status and more" onclick={() => (app.moreOpen = true)}>
+      {#if status.text}<span>{status.text}</span>{/if}
+      <i aria-hidden="true"></i>
+    </button>
   </header>
 
-  <ul aria-label="Status">
-    <li class:ok={shell === 'ready'} class:bad={shell === 'failed' || shell === 'unsupported'}>
-      <span class="dot" aria-hidden="true"></span>{shellText[shell]}
-    </li>
-    <li class:ok={online} class:warn={!online}>
-      <span class="dot" aria-hidden="true"></span>{online ? 'Online' : 'Offline, and still working'}
-    </li>
-    <li class:ok={installed} class:warn={!installed}>
-      <span class="dot" aria-hidden="true"></span>{installed
-        ? 'Installed on this device'
-        : 'Not installed yet: Chrome menu → Add to Home screen → Install'}
-    </li>
-    <li class:ok={persistent === true} class:warn={persistent !== true}>
-      <span class="dot" aria-hidden="true"></span>{persistent === true
-        ? 'Local data is protected from cleanup'
-        : persistent === false
-          ? 'Local data not yet protected (Chrome grants this after install)'
-          : 'Checking local data protection…'}
-    </li>
-  </ul>
+  <main>
+    {#if !app.ready}
+      <!-- local data loads in a few milliseconds; show nothing rather than flash -->
+    {:else if app.tab === 'today'}
+      {#if today.overdue.length}
+        <h2 class="late">Overdue</h2>
+        <ul>
+          {#each today.overdue as item (item.id)}<ItemRow {item} showList />{/each}
+        </ul>
+      {/if}
+      {#if today.today.length}
+        {#if today.overdue.length}<h2>Today</h2>{/if}
+        <ul>
+          {#each today.today as item (item.id)}<ItemRow {item} showList />{/each}
+        </ul>
+      {/if}
+      {#if !todayCount}<p class="empty">Nothing for today.</p>{/if}
+    {:else if app.tab === 'groceries'}
+      {#each groceries.sections as section (section.name)}
+        <h2>{section.name}</h2>
+        <ul>
+          {#each section.items as item (item.id)}<ItemRow {item} />{/each}
+        </ul>
+      {/each}
+      {#if !groceries.sections.length}<p class="empty">Nothing to buy. Start a line with “g ” to add something.</p>{/if}
+      {#if groceries.recent.length}
+        <h2>Recent</h2>
+        <div class="recent">
+          {#each groceries.recent as item (item.id)}
+            <button type="button" onclick={() => app.readd(item.id)}><span aria-hidden="true">+</span> {groceryLabel(item)}</button>
+          {/each}
+        </div>
+      {/if}
+    {:else}
+      <ul>
+        {#each list as item (item.id)}<ItemRow {item} />{/each}
+      </ul>
+      {#if !list.length}
+        <p class="empty">Nothing here. Start a line with “{app.settings.prefixes[app.tab]} ” to file it under {LIST_NAMES[app.tab]}.</p>
+      {/if}
+    {/if}
+  </main>
 
-  <footer>Build {__BUILD_ID__}</footer>
-</main>
+  <div class="dock">
+    {#if app.toast}
+      {#key app.toast.key}
+        <div class="toast" role="status">
+          {#if app.toast.itemId}
+            <button type="button" class="toast-text" onclick={() => app.toast?.itemId && app.edit(app.toast.itemId)}>
+              {app.toast.text}<small>Tap to fix</small>
+            </button>
+          {:else}
+            <span class="toast-text">{app.toast.text}</span>
+          {/if}
+          {#if app.toast.undo}
+            <button type="button" class="undo" onpointerdown={(e) => e.preventDefault()} onclick={() => app.toast?.undo?.()}>Undo</button>
+          {/if}
+        </div>
+      {/key}
+    {/if}
+
+    <nav aria-label="Lists">
+      {#each TABS as tab (tab.id)}
+        <button type="button" aria-current={app.tab === tab.id ? 'page' : undefined} onpointerdown={(e) => e.preventDefault()} onclick={() => (app.tab = tab.id)}>
+          {tab.name}{#if tab.id === 'today' && todayCount}<b>{todayCount}</b>{/if}
+        </button>
+      {/each}
+    </nav>
+
+    <CaptureBar />
+  </div>
+</div>
+
+<Sheet open={app.editing !== null} title="Fix item" onclose={() => (app.editingId = null)}>
+  {#if app.editing}
+    {#key app.editing.id}<EditForm item={app.editing} />{/key}
+  {/if}
+</Sheet>
+
+<Sheet open={app.moreOpen} title="Unforget" onclose={() => (app.moreOpen = false)}>
+  <More />
+</Sheet>
 
 <style>
   :global(:root) {
     color-scheme: light dark;
     --bg: #f7f7f4;
+    --surface: #ffffff;
     --fg: #16191d;
     --muted: #5d6670;
     --line: #dedfda;
+    --accent: #16324f;
+    --on-accent: #ffffff;
     --ok: #1a7f4b;
     --warn: #a15c00;
     --bad: #b3261e;
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-size: 17px;
-    line-height: 1.45;
+    line-height: 1.4;
+    -webkit-text-size-adjust: 100%;
   }
   @media (prefers-color-scheme: dark) {
     :global(:root) {
       --bg: #111417;
+      --surface: #1b1f24;
       --fg: #eceef0;
       --muted: #9aa3ad;
       --line: #2a2f35;
+      --accent: #9cc4ee;
+      --on-accent: #0c1a28;
       --ok: #5fd08f;
       --warn: #f0b354;
       --bad: #ff8a80;
     }
   }
+  :global(html),
   :global(body) {
+    height: 100%;
     margin: 0;
     background: var(--bg);
     color: var(--fg);
-    min-height: 100dvh;
+    overscroll-behavior: none;
   }
-  main {
-    max-width: 30rem;
+  :global(button) {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  :global(button:focus-visible),
+  :global(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .shell {
+    height: 100dvh;
+    max-width: 40rem;
     margin: 0 auto;
-    padding: max(2.5rem, env(safe-area-inset-top)) 1.25rem 2rem;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: max(0.4rem, env(safe-area-inset-top)) 0.25rem 0 1rem;
   }
   h1 {
-    font-size: 1.7rem;
-    margin: 0.75rem 0 0.25rem;
+    font-size: 1.45rem;
     letter-spacing: -0.01em;
-  }
-  .lede {
     margin: 0;
+  }
+  .status {
+    height: 3rem;
+    min-width: 3rem;
+    padding: 0 0.85rem;
+    border: 0;
+    background: none;
     color: var(--muted);
-  }
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 2rem 0;
-    border-top: 1px solid var(--line);
-  }
-  li {
+    font: inherit;
+    font-size: 0.85rem;
     display: flex;
-    gap: 0.75rem;
-    align-items: baseline;
-    padding: 0.85rem 0;
-    border-bottom: 1px solid var(--line);
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
   }
-  .dot {
-    flex: none;
+  .status i {
     width: 0.6rem;
     height: 0.6rem;
     border-radius: 50%;
-    background: var(--muted);
-  }
-  .ok .dot {
     background: var(--ok);
   }
-  .warn .dot {
+  .status.warn i {
     background: var(--warn);
   }
-  .bad .dot {
+  .status.bad i {
     background: var(--bad);
   }
-  footer {
-    color: var(--muted);
+  .status.busy i {
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+  main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 1rem;
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  h2 {
     font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 1.1rem 1rem 0.2rem;
+  }
+  h2.late {
+    color: var(--bad);
+  }
+  .empty {
+    color: var(--muted);
+    padding: 1.5rem 1rem;
+    margin: 0;
+  }
+  .recent {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.4rem 1rem;
+  }
+  .recent button {
+    min-height: 2.75rem;
+    padding: 0 0.9rem;
+    border-radius: 1.4rem;
+    border: 1.5px solid var(--line);
+    background: none;
+    color: var(--muted);
+    font: inherit;
+  }
+  .dock {
+    flex: none;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    position: relative;
+  }
+  nav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  nav button {
+    height: 2.9rem;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.92rem;
+    border-top: 2.5px solid transparent;
+    margin-top: -1px;
+  }
+  nav button[aria-current] {
+    color: var(--fg);
+    font-weight: 650;
+    border-top-color: var(--accent);
+  }
+  nav b {
+    margin-left: 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 1rem;
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .toast {
+    position: absolute;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: calc(100% + 0.6rem);
+    display: flex;
+    align-items: stretch;
+    background: var(--fg);
+    color: var(--bg);
+    border-radius: 0.9rem;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+    overflow: hidden;
+    animation: rise 0.16s ease-out;
+  }
+  @keyframes rise {
+    from {
+      transform: translateY(0.5rem);
+      opacity: 0;
+    }
+  }
+  .toast-text {
+    flex: 1;
+    min-width: 0;
+    padding: 0.7rem 0.9rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .toast-text small {
+    display: block;
+    opacity: 0.65;
+    font-size: 0.78rem;
+  }
+  .undo {
+    flex: none;
+    min-width: 4.5rem;
+    border: 0;
+    border-left: 1px solid color-mix(in srgb, var(--bg) 25%, transparent);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 650;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast,
+    .status.busy i {
+      animation: none;
+    }
   }
 </style>

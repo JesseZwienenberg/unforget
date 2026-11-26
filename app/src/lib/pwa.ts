@@ -3,10 +3,16 @@
 export type ShellStatus = 'unsupported' | 'installing' | 'ready' | 'failed';
 
 /** Registers the service worker and resolves once the app shell is cached and controlled. */
-export async function registerServiceWorker(onStatus: (s: ShellStatus) => void): Promise<void> {
+export async function registerServiceWorker(onStatus: (s: ShellStatus) => void, onUpdate: () => void = () => {}): Promise<void> {
   if (!('serviceWorker' in navigator)) return onStatus('unsupported');
   if (!import.meta.env.PROD) return onStatus('unsupported'); // no service worker in dev
   onStatus('installing');
+  // A new version takes over in the background; this page keeps running the old
+  // one until it is reloaded, so tell the app an update is ready.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) onUpdate();
+  });
   try {
     await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
       scope: import.meta.env.BASE_URL,

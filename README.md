@@ -5,8 +5,8 @@ The app splits it into items, files them under Work, Personal or Groceries, and 
 time it finds into a reminder. Nothing needs organising: items with a time remind you,
 items without one quietly fade away.
 
-**Status:** M0 (bootstrap). The app is an installable placeholder; see
-[docs/PROGRESS.md](docs/PROGRESS.md).
+**Status:** M1 (capture). Capturing, lists, sync between devices, share target and export
+work; reminders are stored but not yet delivered (M2). See [docs/PROGRESS.md](docs/PROGRESS.md).
 
 - App: https://jessezwienenberg.github.io/unforget/
 - Full specification: [docs/SPEC.md](docs/SPEC.md)
@@ -18,6 +18,9 @@ items without one quietly fade away.
 app/      Svelte + Vite single-page app, installed as a PWA from Chrome.
           Static files on GitHub Pages under /unforget/. A service worker
           precaches the whole app, so it opens without any network.
+shared/   Code used by both sides: data types, the on-device parser (list
+          prefixes and "in 10 min" / "over een kwartier"), time-zone helpers,
+          last-write-wins merge, input validation.
 worker/   One Cloudflare Worker (TypeScript) with a D1 database, free plan.
           Does only what static hosting cannot: store data, keep secrets,
           run code at a set time.
@@ -29,9 +32,33 @@ Every push to `main` runs `.github/workflows/deploy.yml`: typecheck, lint, tests
 offline check in real Chrome, then deploy the app to GitHub Pages and the Worker to
 Cloudflare (including D1 migrations), then a smoke test against the deployed Worker.
 
+## How data flows
+
+Everything is saved on the device first (IndexedDB), so capture never waits for the
+network. Changed rows wait in an outbox and are sent to `POST /v1/sync`, which applies them
+(last write wins per row) and returns everything changed since the device's cursor. The
+raw text of every capture is kept forever.
+
 ## Setup
 
 One-time, browser only: [docs/SETUP.md](docs/SETUP.md).
+
+Each device is connected once by opening a setup link in Chrome:
+
+```
+https://jessezwienenberg.github.io/unforget/#setup=<APP_TOKEN>&api=https://unforget.jessez1997.workers.dev
+```
+
+The app stores the token on the device and removes it from the address bar.
+
+## Using it
+
+- Type and press enter. `w `, `p ` or `g ` at the start files it under Work, Personal or
+  Groceries; without a prefix it goes to Personal.
+- "in 10 min", "over een kwartier", "in an hour", "over 2 uur" set a reminder time.
+- Tap the toast to fix the list, time or title; Undo removes the capture.
+- Share text or a link from any Android app to Unforget to capture it.
+- The dot in the top right shows sync status; tap it for Sync now and Export.
 
 ## Rotating the token
 
@@ -54,4 +81,5 @@ allowed browser origins: `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`.
 
 ## Development
 
-Requires Node 22. `npm ci`, then `npm run check` runs everything CI runs.
+Requires Node 22 and Chrome. `npm ci`, then `npm run check` runs everything CI runs:
+typecheck, lint, unit tests, build, and the end-to-end tests in Chrome.

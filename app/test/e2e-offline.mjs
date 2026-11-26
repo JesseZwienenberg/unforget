@@ -1,5 +1,4 @@
-// End-to-end check for the one thing M0 promises: after one visit, the app opens
-// with no network. Runs the production build in real Chrome. `npm run e2e -w app`.
+// End-to-end check that after one visit the app opens, and captures, with no network. Runs the production build in real Chrome. `npm run e2e -w app`.
 import { chromium } from 'playwright-core';
 import { preview } from 'vite';
 
@@ -15,18 +14,22 @@ try {
   page.on('pageerror', (e) => errors.push(e.message));
 
   await page.goto(url);
-  await page.waitForSelector('li.ok:has-text("Ready to open offline")', { timeout: 15000 });
+  // Wait until the service worker has cached the shell and controls the page.
+  await page.waitForFunction(() => navigator.serviceWorker.ready.then(() => Boolean(navigator.serviceWorker.controller)), null, { timeout: 15000 });
 
   const cacheNames = await page.evaluate(() => caches.keys());
   if (!cacheNames.every((n) => n.startsWith('unforget-'))) throw new Error(`unexpected cache names: ${cacheNames}`);
 
   await context.setOffline(true);
   await page.reload();
-  await page.waitForSelector('li:has-text("Offline, and still working")', { timeout: 15000 });
+  await page.getByLabel('Capture').waitFor({ timeout: 15000 });
+  await page.getByLabel('Capture').fill('p offline note');
+  await page.getByLabel('Capture').press('Enter');
+  await page.getByText('Saved → Personal · offline note').waitFor({ timeout: 5000 });
 
   // The setup link and share target add a fragment or query; the shell must still load.
-  await page.goto(`${url}?source=share#setup=x`);
-  await page.waitForSelector('h1:has-text("Unforget")', { timeout: 15000 });
+  await page.goto(`${url}?source=share#other`);
+  await page.getByLabel('Capture').waitFor({ timeout: 15000 });
 
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
   console.log('e2e offline: ok');
