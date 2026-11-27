@@ -226,6 +226,19 @@ try {
   await phone.page.getByLabel('Mark done: Melk × 2').waitFor({ timeout: 10000 });
   if ((await phone.page.getByLabel(/^Mark done: Melk/).count()) !== 1) throw new Error('duplicate grocery line');
 
+  step('renaming a sorted grocery changes what the list shows');
+  await phone.tab('Groceries');
+  await phone.page.locator('li', { hasText: 'Brood' }).locator('button.body').click();
+  const rename = phone.page.getByRole('dialog', { name: 'Fix item' });
+  await rename.getByLabel('Title').fill('volkoren brood');
+  await rename.getByRole('button', { name: 'Save' }).click();
+  await phone.page.getByLabel('Mark done: Volkoren brood × 2').waitFor({ timeout: 5000 });
+  await phone.synced();
+  await phone.page.reload();
+  await phone.synced();
+  await phone.tab('Groceries');
+  await phone.page.getByLabel('Mark done: Volkoren brood × 2').waitFor({ timeout: 5000 });
+
   step('no jump: when the model does not answer, the item waits a few seconds, then shows under Personal');
   await phone.tab('Personal');
   await phone.capture('fiets naar de maker');

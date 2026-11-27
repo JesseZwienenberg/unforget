@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createCapture } from '$shared/capture';
 import { DEFAULT_SETTINGS } from '$shared/settings';
 import type { Item } from '$shared/types';
-import { groceryLabel, groceryView, isOverdue, listItems, todayView } from '../src/lib/views';
+import { groceryAfterEdit, groceryLabel, groceryView, isOverdue, listItems, todayView } from '../src/lib/views';
 
 const TZ = 'Europe/Amsterdam';
 const NOW = new Date('2026-11-26T13:00:00.000Z'); // Thu 26 Nov 14:00 local
@@ -89,8 +89,21 @@ describe('groceryView', () => {
     expect(titles(view.recent)).toEqual(['Bread', 'Milk']);
   });
 
+  it('shows the title, so an edited name is what you see', () => {
+    const edited = item('g melk', { title: 'Havermelk', grocery: { canonicalName: 'milk', displayName: 'Melk', quantity: 2, section: 'Dairy & eggs' } });
+    expect(groceryLabel(edited)).toBe('Havermelk × 2');
+  });
+
+  it('renaming a grocery renames what duplicates are matched on, and keeps section and quantity', () => {
+    const old = item('g melk', { grocery: { canonicalName: 'milk', displayName: 'Melk', quantity: 2, section: 'Dairy & eggs' } });
+    expect(groceryAfterEdit(old, 'Havermelk', 'groceries')).toEqual({ canonicalName: 'havermelk', displayName: 'Havermelk', quantity: 2, section: 'Dairy & eggs' });
+    expect(groceryAfterEdit(old, old.title, 'groceries')).toBe(old.grocery);
+    expect(groceryAfterEdit(old, old.title, 'personal')).toBeNull();
+    expect(groceryAfterEdit(item('p iets'), 'Iets anders', 'groceries')).toBeNull();
+  });
+
   it('labels quantities', () => {
-    expect(groceryLabel(g('melk', 'Dairy & eggs'))).toBe('melk');
-    expect(groceryLabel(item('g melk', { grocery: { canonicalName: 'milk', displayName: 'melk', quantity: 2, section: 'Dairy & eggs' } }))).toBe('melk × 2');
+    expect(groceryLabel(g('melk', 'Dairy & eggs'))).toBe('Melk');
+    expect(groceryLabel(item('g melk', { grocery: { canonicalName: 'milk', displayName: 'melk', quantity: 2, section: 'Dairy & eggs' } }))).toBe('Melk × 2');
   });
 });

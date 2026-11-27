@@ -90,12 +90,23 @@ export function groceryView(items: Item[], settings: Settings): { sections: Groc
   return { sections, recent };
 }
 
+/**
+ * The grocery details that go with an edited item. Renaming a grocery also renames
+ * what de-duplication matches on; moving it off the grocery list drops the details.
+ */
+export function groceryAfterEdit(old: Item, title: string, list: ListId): Item['grocery'] {
+  if (list !== 'groceries' || !old.grocery) return null;
+  if (title === old.title) return old.grocery;
+  return { ...old.grocery, displayName: title, canonicalName: title.trim().toLowerCase() };
+}
+
 export function groceryKey(item: Item): string {
   return (item.grocery?.canonicalName ?? item.title).trim().toLowerCase();
 }
 
+/** What a grocery line shows. The title is the truth: it is what an edit changes. */
 export function groceryLabel(item: Item): string {
-  const name = item.grocery?.displayName ?? item.title;
+  const name = item.title;
   const q = item.grocery?.quantity;
   return q && q !== 1 ? `${name} × ${q}` : name;
 }

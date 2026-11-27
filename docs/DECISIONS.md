@@ -120,6 +120,8 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 - Every item's title starts with a capital: applied by code on the device (`createCapture`), after the model (`settle`, also the grocery display name) and when saving an edit. Links are left alone. The raw capture text is never changed. Existing items were not rewritten.
 - Spending is tracked on the server: each model call's token counts (from the API's `usage`) are added to `llm_usage` per local day, including calls whose answer was unusable. `GET /v1/usage` returns today, this month, all time and per day; the More sheet shows it. Cost = tokens × list prices in `shared/src/cost.ts` (US dollars); the Anthropic Console remains the authoritative bill. Eval-workflow calls are not counted: they run in GitHub Actions, not through the Worker.
 
+- Bug fix (27 Nov): renaming a sorted grocery did not change the list, because grocery lines showed the sorter's `displayName` instead of the title. Lines now show the title; renaming also updates `displayName` and the name duplicates are matched on (the lowercased new title), keeps section and quantity, and moving an item off the grocery list drops its grocery details.
+
 ## Later
 
 Nothing yet.

@@ -14,6 +14,7 @@ import { registerServiceWorker, requestPersistentStorage, type ShellStatus } fro
 import { DexieStorage } from './storage/dexie';
 import type { Config, Storage } from './storage/types';
 import { OfflineError, runSync, UnauthorizedError } from './sync';
+import { groceryAfterEdit } from './views';
 
 export type Tab = 'today' | ListId;
 export type SyncState = 'unconfigured' | 'idle' | 'syncing' | 'offline' | 'unauthorized' | 'error';
@@ -365,7 +366,10 @@ class App {
 
   /** Saves a manual fix. A hand-edited item is no longer provisional: the sorter must not overwrite it. */
   async saveEdit(id: string, patch: Pick<Item, 'title' | 'list' | 'remindAt' | 'dueAt'>): Promise<void> {
-    await this.change(id, { ...patch, title: capitalizeFirst(patch.title), provisional: false, unsorted: false });
+    const old = this.items.find((i) => i.id === id);
+    if (!old) return;
+    const title = capitalizeFirst(patch.title);
+    await this.change(id, { ...patch, title, grocery: groceryAfterEdit(old, title, patch.list), provisional: false, unsorted: false });
     this.stopWaiting(id);
     this.editingId = null;
   }
