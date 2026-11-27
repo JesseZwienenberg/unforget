@@ -9,7 +9,7 @@ import worker from '../src/index';
 import { derivedId, MAX_ATTEMPTS, settle, sortCapture, sortPending, type SortDeps } from '../src/sort/apply';
 import type { Sorter } from '../src/sort/llm';
 import { extractToolInput, InvalidOutput, parseModelTime, parseSortOutput, type SortedItem } from '../src/sort/output';
-import { buildRequest, buildUserMessage, toLocalIso, type PromptInput } from '../src/sort/prompt';
+import { buildRequest, buildUserMessage, dutchClockHints, toLocalIso, type PromptInput } from '../src/sort/prompt';
 import { sync } from '../src/sync';
 import { createTestD1, type TestD1 } from './d1';
 
@@ -74,6 +74,17 @@ describe('prompt', () => {
   it('writes local times with the right offset', () => {
     expect(toLocalIso(new Date('2026-11-26T13:13:00.000Z'), S.timeZone)).toBe('2026-11-26T14:13:00+01:00');
     expect(toLocalIso(new Date('2026-03-29T01:30:00.000Z'), S.timeZone)).toBe('2026-03-29T03:30:00+02:00');
+  });
+
+  it('spells out Dutch clock phrases for the model', () => {
+    expect(dutchClockHints('half 4 Lisa ophalen')).toEqual(['"half 4" means 3:30 (so 3:30 or 15:30)']);
+    expect(dutchClockHints('morgen half negen tandarts')).toEqual(['"half negen" means 8:30 (so 8:30 or 20:30)']);
+    expect(dutchClockHints('half 1 lunch')).toEqual(['"half 1" means 12:30 (so 12:30 or 0:30)']);
+    expect(dutchClockHints('kwart voor 6 trein')).toEqual(['"kwart voor 6" means 5:45 (so 5:45 or 17:45)']);
+    expect(dutchClockHints('kwart over 8 standup')).toEqual(['"kwart over 8" means 8:15 (so 8:15 or 20:15)']);
+    expect(dutchClockHints('half uur wandelen, half 20 liter, de helft')).toEqual([]);
+    expect(buildUserMessage({ ...input, text: 'half 4 ophalen' })).toContain('Clock hints: "half 4" means 3:30');
+    expect(buildUserMessage(input)).toContain('Clock hints: none');
   });
 
   it('forces the tool, names the model, and sends no sampling parameters', () => {

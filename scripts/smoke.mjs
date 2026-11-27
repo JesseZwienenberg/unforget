@@ -23,7 +23,10 @@ for (let attempt = 1; attempt <= 30; attempt++) {
   try {
     const res = await fetch(`${base}/health`, { headers: { origin } });
     const body = await res.json();
-    if (res.ok && (!expectVersion || body.version === expectVersion)) {
+    // Secrets are applied just after the deploy and take a moment to reach every
+    // location, so wait for them too before judging (but stop waiting after a while).
+    const secretsLive = body.tokenConfigured && body.pushConfigured && body.llmConfigured;
+    if (res.ok && (!expectVersion || body.version === expectVersion) && (secretsLive || attempt > 12)) {
       health = { res, body };
       break;
     }

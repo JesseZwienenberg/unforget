@@ -29,7 +29,8 @@ export const SYSTEM_PROMPT = `You file quick personal notes for one person, Jess
    - A day without a clock time, used as a reminder ("morgen", "tomorrow", "vrijdag", "next Monday") = that day at the morning time.
    - Vague parts of the day use the clock times from the user message: morning (ochtend, 's ochtends, morgenochtend, vanochtend), afternoon (middag, 's middags, vanmiddag, morgenmiddag), evening (avond, 's avonds, vanavond, tonight, morgenavond). "dit weekend" / "this weekend" = the coming Saturday at the weekend time.
    - A weekday name means the next such day after the capture day. "volgende week" / "next week" without a day = Monday of next week.
-   - Ambiguous clock times ("om 3 uur", "half 3", "kwart over 2", "at 7") = the nearest future time between 07:00 and 22:59. Remember Dutch "half 3" is 2:30.
+   - Ambiguous clock times ("om 3 uur", "kwart over 2", "at 7") = the nearest future time between 07:00 and 22:59.
+   - Dutch "half N" is thirty minutes BEFORE N o'clock: "half 4" is 3:30, "half 5" is 4:30, "half 9" is 8:30. When the user message has clock hints, follow them.
    - If the user message has a device reminder, the phone already computed a relative time ("over 10 minuten", "in an hour"): copy it exactly into remindAt for the item it belongs to.
 
 5. Groceries. For every groceries item fill "grocery":
@@ -142,6 +143,28 @@ function weekday(isoDate: string): string {
   return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]!;
 }
 
+const HOUR_WORDS: Record<string, number> = {
+  een: 1, één: 1, twee: 2, drie: 3, vier: 4, vijf: 5, zes: 6, zeven: 7, acht: 8, negen: 9, tien: 10, elf: 11, twaalf: 12,
+};
+const HOUR = String.raw`(\d{1,2}|${Object.keys(HOUR_WORDS).join('|')})`;
+
+/**
+ * Dutch clock phrases the model tends to misread ("half 4" is 3:30, not 4:30),
+ * spelled out by code so it does not have to work them out.
+ */
+export function dutchClockHints(text: string): string[] {
+  const hints: string[] = [];
+  const hourOf = (raw: string) => HOUR_WORDS[raw.toLowerCase()] ?? Number(raw);
+  const on12 = (h: number) => ((h + 11) % 12) + 1;
+  const add = (phrase: string, hour: number, minute: string) => {
+    if (hour >= 1 && hour <= 12) hints.push(`"${phrase.trim()}" means ${on12(hour)}:${minute} (so ${on12(hour)}:${minute} or ${on12(hour) === 12 ? 0 : on12(hour) + 12}:${minute})`);
+  };
+  for (const m of text.matchAll(new RegExp(String.raw`(?<![\p{L}\p{N}])half\s+${HOUR}(?![\p{L}\p{N}:.])`, 'giu'))) add(m[0], hourOf(m[1]!) - 1 || 12, '30');
+  for (const m of text.matchAll(new RegExp(String.raw`(?<![\p{L}\p{N}])kwart\s+voor\s+${HOUR}(?![\p{L}\p{N}:.])`, 'giu'))) add(m[0], hourOf(m[1]!) - 1 || 12, '45');
+  for (const m of text.matchAll(new RegExp(String.raw`(?<![\p{L}\p{N}])kwart\s+over\s+${HOUR}(?![\p{L}\p{N}:.])`, 'giu'))) add(m[0], hourOf(m[1]!), '15');
+  return hints;
+}
+
 export interface PromptInput {
   /** The capture text without its list prefix. */
   text: string;
@@ -171,6 +194,7 @@ export function buildUserMessage(input: PromptInput): string {
     `Grocery sections: ${settings.grocerySections.join(' | ')}`,
     `Fixed list: ${input.fixedList ?? 'none'}`,
     `Device reminder: ${input.deviceRemindAt ? toLocalIso(new Date(input.deviceRemindAt), tz) : 'none'}`,
+    `Clock hints: ${dutchClockHints(input.text).join('; ') || 'none'}`,
     `Capture:\n<capture>\n${input.text}\n</capture>`,
   ].join('\n\n');
 }
