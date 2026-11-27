@@ -165,6 +165,29 @@ export function dutchClockHints(text: string): string[] {
   return hints;
 }
 
+/**
+ * A bare hour without am/pm ("at 7", "om 3 uur") is ambiguous. Work out the nearest
+ * upcoming one in waking hours (07:00 to 22:59) so the model does not have to guess.
+ */
+export function bareHourHints(text: string, capturedAt: Date, timeZone: string): string[] {
+  const now = toWallTime(capturedAt, timeZone);
+  const nowMinutes = now.hour * 60 + now.minute;
+  const hints: string[] = [];
+  const re = /(?<![\p{L}\p{N}])(at|om)\s+(\d{1,2})(?:[:.](\d\d))?(?:\s*uur)?(?![\p{L}\p{N}:.]|\s*(?:am|pm|a\.m|p\.m))/giu;
+  for (const m of text.matchAll(re)) {
+    const hour = Number(m[2]);
+    const minute = Number(m[3] ?? 0);
+    if (hour < 1 || hour > 12 || minute > 59) continue; // 13 and up is already unambiguous
+    const options = [hour % 12, (hour % 12) + 12].filter((h) => h >= 7 && h <= 22);
+    const upcoming = options.find((h) => h * 60 + minute > nowMinutes);
+    const pick = upcoming ?? options[0];
+    if (pick === undefined) continue;
+    const clock = `${pad(pick)}:${pad(minute)}`;
+    hints.push(`if "${m[0].trim()}" is a clock time with no day or part of day mentioned, it means ${clock} ${upcoming === undefined ? 'tomorrow' : 'today'}`);
+  }
+  return hints;
+}
+
 export interface PromptInput {
   /** The capture text without its list prefix. */
   text: string;
@@ -194,7 +217,7 @@ export function buildUserMessage(input: PromptInput): string {
     `Grocery sections: ${settings.grocerySections.join(' | ')}`,
     `Fixed list: ${input.fixedList ?? 'none'}`,
     `Device reminder: ${input.deviceRemindAt ? toLocalIso(new Date(input.deviceRemindAt), tz) : 'none'}`,
-    `Clock hints: ${dutchClockHints(input.text).join('; ') || 'none'}`,
+    `Clock hints: ${[...dutchClockHints(input.text), ...bareHourHints(input.text, capturedAt, tz)].join('; ') || 'none'}`,
     `Capture:\n<capture>\n${input.text}\n</capture>`,
   ].join('\n\n');
 }

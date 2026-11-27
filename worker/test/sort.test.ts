@@ -9,7 +9,7 @@ import worker from '../src/index';
 import { derivedId, MAX_ATTEMPTS, settle, sortCapture, sortPending, type SortDeps } from '../src/sort/apply';
 import type { Sorter } from '../src/sort/llm';
 import { extractToolInput, InvalidOutput, parseModelTime, parseSortOutput, type SortedItem } from '../src/sort/output';
-import { buildRequest, buildUserMessage, dutchClockHints, toLocalIso, type PromptInput } from '../src/sort/prompt';
+import { bareHourHints, buildRequest, buildUserMessage, dutchClockHints, toLocalIso, type PromptInput } from '../src/sort/prompt';
 import { sync } from '../src/sync';
 import { usageReport } from '../src/usage';
 import { createTestD1, type TestD1 } from './d1';
@@ -119,6 +119,23 @@ describe('prompt', () => {
     expect(dutchClockHints('half uur wandelen, half 20 liter, de helft')).toEqual([]);
     expect(buildUserMessage({ ...input, text: 'half 4 ophalen' })).toContain('Clock hints: "half 4" means 3:30');
     expect(buildUserMessage(input)).toContain('Clock hints: none');
+  });
+
+  it('resolves a bare hour to the nearest upcoming one in waking hours', () => {
+    const at1403 = new Date('2026-11-26T13:03:00.000Z'); // 14:03 local
+    const hint = (text: string, when = at1403) => bareHourHints(text, when, S.timeZone);
+    expect(hint('at 7 pick up the pizza')).toEqual(['if "at 7" is a clock time with no day or part of day mentioned, it means 19:00 today']);
+    expect(hint('om 3 uur bellen')).toEqual(['if "om 3 uur" is a clock time with no day or part of day mentioned, it means 15:00 today']);
+    expect(hint('om 2 uur bellen')).toEqual(['if "om 2 uur" is a clock time with no day or part of day mentioned, it means 14:00 tomorrow']);
+    expect(hint('om 9.30 afspraak')).toEqual(['if "om 9.30" is a clock time with no day or part of day mentioned, it means 21:30 today']);
+    expect(hint('at 9 standup', new Date('2026-11-26T06:30:00.000Z'))).toEqual(['if "at 9" is a clock time with no day or part of day mentioned, it means 09:00 today']);
+    expect(hint('at 12 lunch', new Date('2026-11-26T08:00:00.000Z'))).toEqual(['if "at 12" is a clock time with no day or part of day mentioned, it means 12:00 today']);
+    // Already unambiguous, or not a clock time at all
+    expect(hint('om 15 uur bellen')).toEqual([]);
+    expect(hint('at 7pm dinner')).toEqual([]);
+    expect(hint('at 7 am gym')).toEqual([]);
+    expect(hint('om 14:00 call')).toEqual([]);
+    expect(hint('look at 3 options, om de 2 weken')).toEqual(['if "at 3" is a clock time with no day or part of day mentioned, it means 15:00 today']);
   });
 
   it('forces the tool, names the model, and sends no sampling parameters', () => {

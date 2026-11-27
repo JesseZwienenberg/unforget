@@ -78,6 +78,8 @@ export const CASES: EvalCase[] = [
   { text: 'kwart voor 6 trein halen', expect: [{ list: 'personal', title: 'trein halen', remindAt: '2026-11-26 17:45' }] },
   { text: 'vrijdag kwart over 8 standup with the new team', expect: [{ list: 'work', title: 'standup', remindAt: '2026-11-27 08:15' }] },
   { text: 'at 7 pick up the pizza', expect: [{ list: 'personal', title: 'pizza', remindAt: '2026-11-26 19:00' }] },
+  { text: 'om 3 uur de loodgieter bellen', expect: [{ list: 'personal', title: 'loodgieter bellen', remindAt: '2026-11-26 15:00' }] },
+  { text: 'look at 3 options for a new laptop', expect: [{ list: 'personal', title: 'options', remindAt: null, dueAt: null }] },
   { text: 'zaterdag om 11 uur kapper', expect: [{ list: 'personal', title: 'kapper', remindAt: '2026-11-28 11:00' }] },
   { text: 'call the plumber tomorrow afternoon about de lekkage', expect: [{ list: 'personal', title: 'plumber', remindAt: '2026-11-27 13:00' }] },
   { text: 'vanmiddag om 4 uur tandarts', expect: [{ list: 'personal', title: 'tandarts', remindAt: '2026-11-26 16:00' }] },
