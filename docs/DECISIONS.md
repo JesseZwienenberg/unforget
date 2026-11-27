@@ -107,7 +107,9 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 - Unknown grocery sections from the model fall back to "Other" rather than failing the sort.
 - The toast updates when the sorted result arrives ("Saved → 3 items · …"); Undo still removes everything the capture produced, except a quantity that was merged into an existing grocery line.
 - "Sort captures automatically" switch lives in the More sheet for now; the full settings screen is M4.
-- Model output fixtures in `worker/test/fixtures/llm/outputs.json` are hand-written to the contract; real recorded answers come from the eval workflow's artifact.
+- Two fixture files: `recorded.json` holds real model answers copied from the eval workflow's log (the workspace can't download artifacts), `outputs.json` holds hand-written edge cases that must be tolerated or rejected.
+- Dutch clock phrases ("half 4", "kwart voor 6", "kwart over 8") are detected by code and spelled out for the model as hints: the first eval run read "half 4" as 16:30. With the hints the eval set scored 36 of 36 on four consecutive runs (median response about 650 ms).
+- The smoke test waits up to a minute for freshly applied Worker secrets before judging: the first deploy with a new secret raced it.
 - Evals run through Vitest with their own config (`vitest.eval.config.ts`) so they can import the Worker's real prompt and validation code; they are never part of CI.
 - `ANTHROPIC_BASE_URL` exists only so the end-to-end test can point the Worker at a stand-in model.
 - Cost: about 2,500 input and 150 output tokens per capture at $0.10 / $0.50 per million tokens is roughly $0.0003 per capture; the 300-per-day cap bounds it at about 10 cents a day.

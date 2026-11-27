@@ -1,0 +1,733 @@
+{
+ "_note": "Real answers from claude-haiku-5-5, recorded from the Eval sorting workflow log on 2026-11-27 (capture time Thu 26 Nov 2026 14:03 Amsterdam). To refresh: run the workflow and copy the RAW lines from its log.",
+ "recorded": [
+  {
+   "text": "ketchup",
+   "output": {
+    "items": [
+     {
+      "title": "ketchup",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "ketchup",
+       "displayName": "ketchup",
+       "quantity": null,
+       "section": "Pantry"
+      },
+      "confidence": 0.95
+     }
+    ]
+   }
+  },
+  {
+   "text": "bananen",
+   "output": {
+    "items": [
+     {
+      "title": "bananen",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "banana",
+       "displayName": "bananen",
+       "quantity": null,
+       "section": "Fruit & vegetables"
+      },
+      "confidence": 0.95
+     }
+    ]
+   }
+  },
+  {
+   "text": "kaas, yoghurt en 2 komkommers",
+   "output": {
+    "items": [
+     {
+      "title": "kaas",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "cheese",
+       "displayName": "kaas",
+       "quantity": null,
+       "section": "Cheese & deli"
+      },
+      "confidence": 0.96
+     },
+     {
+      "title": "yoghurt",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "yogurt",
+       "displayName": "yoghurt",
+       "quantity": null,
+       "section": "Dairy & eggs"
+      },
+      "confidence": 0.96
+     },
+     {
+      "title": "komkommers",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "cucumber",
+       "displayName": "komkommers",
+       "quantity": 2,
+       "section": "Fruit & vegetables"
+      },
+      "confidence": 0.96
+     }
+    ]
+   }
+  },
+  {
+   "text": "wc eend en afwasmiddel",
+   "output": {
+    "items": [
+     {
+      "title": "wc eend",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "toilet cleaner",
+       "displayName": "wc eend",
+       "quantity": null,
+       "section": "Household"
+      },
+      "confidence": 0.9
+     },
+     {
+      "title": "afwasmiddel",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "dish soap",
+       "displayName": "afwasmiddel",
+       "quantity": null,
+       "section": "Household"
+      },
+      "confidence": 0.95
+     }
+    ]
+   }
+  },
+  {
+   "text": "tandpasta shampoo deodorant",
+   "output": {
+    "items": [
+     {
+      "title": "tandpasta",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "toothpaste",
+       "displayName": "tandpasta",
+       "quantity": null,
+       "section": "Personal care"
+      },
+      "confidence": 0.95
+     },
+     {
+      "title": "shampoo",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "shampoo",
+       "displayName": "shampoo",
+       "quantity": null,
+       "section": "Personal care"
+      },
+      "confidence": 0.95
+     },
+     {
+      "title": "deodorant",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "deodorant",
+       "displayName": "deodorant",
+       "quantity": null,
+       "section": "Personal care"
+      },
+      "confidence": 0.95
+     }
+    ]
+   }
+  },
+  {
+   "text": "g 3 blikken tomaten",
+   "output": {
+    "items": [
+     {
+      "title": "blikken tomaten",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "canned tomato",
+       "displayName": "blikken tomaten",
+       "quantity": 3,
+       "section": "Pantry"
+      },
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "pak havermelk, coffee beans en 2 avocado's",
+   "output": {
+    "items": [
+     {
+      "title": "havermelk",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "oat milk",
+       "displayName": "havermelk",
+       "quantity": null,
+       "section": "Dairy & eggs"
+      },
+      "confidence": 0.95
+     },
+     {
+      "title": "coffee beans",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "coffee beans",
+       "displayName": "coffee beans",
+       "quantity": null,
+       "section": "Drinks"
+      },
+      "confidence": 0.95
+     },
+     {
+      "title": "avocado's",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "avocado",
+       "displayName": "avocado's",
+       "quantity": 2,
+       "section": "Fruit & vegetables"
+      },
+      "confidence": 0.95
+     }
+    ]
+   }
+  },
+  {
+   "text": "kip, rijst en doe ook maar chips",
+   "output": {
+    "items": [
+     {
+      "title": "kip",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "chicken",
+       "displayName": "kip",
+       "quantity": null,
+       "section": "Meat & fish"
+      },
+      "confidence": 0.95
+     },
+     {
+      "title": "rijst",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "rice",
+       "displayName": "rijst",
+       "quantity": null,
+       "section": "Pantry"
+      },
+      "confidence": 0.95
+     },
+     {
+      "title": "chips",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "chips",
+       "displayName": "chips",
+       "quantity": null,
+       "section": "Snacks"
+      },
+      "confidence": 0.95
+     }
+    ]
+   }
+  },
+  {
+   "text": "paracetamol en pleisters",
+   "output": {
+    "items": [
+     {
+      "title": "paracetamol",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "paracetamol",
+       "displayName": "paracetamol",
+       "quantity": null,
+       "section": "Personal care"
+      },
+      "confidence": 0.85
+     },
+     {
+      "title": "pleisters",
+      "list": "groceries",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "plaster",
+       "displayName": "pleisters",
+       "quantity": null,
+       "section": "Personal care"
+      },
+      "confidence": 0.85
+     }
+    ]
+   }
+  },
+  {
+   "text": "morgen om 9 uur garage bellen",
+   "output": {
+    "items": [
+     {
+      "title": "garage bellen",
+      "list": "personal",
+      "remindAt": "2026-11-27T09:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "vanavond vuilnis buiten zetten",
+   "output": {
+    "items": [
+     {
+      "title": "vuilnis buiten zetten",
+      "list": "personal",
+      "remindAt": "2026-11-26T20:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "remind me tomorrow morning to email Sarah about the contract",
+   "output": {
+    "items": [
+     {
+      "title": "email Sarah about the contract",
+      "list": "work",
+      "remindAt": "2026-11-27T07:45:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "dit weekend schuur opruimen",
+   "output": {
+    "items": [
+     {
+      "title": "schuur opruimen",
+      "list": "personal",
+      "remindAt": "2026-11-28T10:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.92
+     }
+    ]
+   }
+  },
+  {
+   "text": "dinsdag 14:00 call met leverancier",
+   "output": {
+    "items": [
+     {
+      "title": "call met leverancier",
+      "list": "work",
+      "remindAt": "2026-12-01T14:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "half 4 Lisa ophalen van school",
+   "output": {
+    "items": [
+     {
+      "title": "Lisa ophalen van school",
+      "list": "personal",
+      "remindAt": "2026-11-26T15:30:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "morgen half negen tandarts",
+   "output": {
+    "items": [
+     {
+      "title": "tandarts",
+      "list": "personal",
+      "remindAt": "2026-11-27T08:30:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "kwart voor 6 trein halen",
+   "output": {
+    "items": [
+     {
+      "title": "trein halen",
+      "list": "personal",
+      "remindAt": "2026-11-26T17:45:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.88
+     }
+    ]
+   }
+  },
+  {
+   "text": "vrijdag kwart over 8 standup with the new team",
+   "output": {
+    "items": [
+     {
+      "title": "standup with the new team",
+      "list": "work",
+      "remindAt": "2026-11-27T08:15:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "at 7 pick up the pizza",
+   "output": {
+    "items": [
+     {
+      "title": "pick up the pizza",
+      "list": "groceries",
+      "remindAt": "2026-11-26T19:00:00+01:00",
+      "dueAt": null,
+      "grocery": {
+       "canonicalName": "pizza",
+       "displayName": "pizza",
+       "quantity": null,
+       "section": "Frozen"
+      },
+      "confidence": 0.5
+     }
+    ]
+   }
+  },
+  {
+   "text": "zaterdag om 11 uur kapper",
+   "output": {
+    "items": [
+     {
+      "title": "kapper",
+      "list": "personal",
+      "remindAt": "2026-11-28T11:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "call the plumber tomorrow afternoon about de lekkage",
+   "output": {
+    "items": [
+     {
+      "title": "call the plumber about de lekkage",
+      "list": "personal",
+      "remindAt": "2026-11-27T13:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "vanmiddag om 4 uur tandarts",
+   "output": {
+    "items": [
+     {
+      "title": "tandarts",
+      "list": "personal",
+      "remindAt": "2026-11-26T16:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "volgende week dinsdag APK auto",
+   "output": {
+    "items": [
+     {
+      "title": "APK auto",
+      "list": "personal",
+      "remindAt": "2026-12-01T07:45:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "morgen oma bellen",
+   "output": {
+    "items": [
+     {
+      "title": "oma bellen",
+      "list": "personal",
+      "remindAt": "2026-11-27T07:45:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "over 20 minuten was uit de machine halen",
+   "output": {
+    "items": [
+     {
+      "title": "was uit de machine halen",
+      "list": "personal",
+      "remindAt": "2026-11-26T14:23:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "w over een uur Jan terugbellen",
+   "output": {
+    "items": [
+     {
+      "title": "Jan terugbellen",
+      "list": "work",
+      "remindAt": "2026-11-26T15:03:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.85
+     }
+    ]
+   }
+  },
+  {
+   "text": "p sportschool opzeggen",
+   "output": {
+    "items": [
+     {
+      "title": "sportschool opzeggen",
+      "list": "personal",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "voor vrijdag declaraties indienen",
+   "output": {
+    "items": [
+     {
+      "title": "declaraties indienen",
+      "list": "work",
+      "remindAt": null,
+      "dueAt": "2026-11-27",
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "book flights to Lisbon by next Friday",
+   "output": {
+    "items": [
+     {
+      "title": "book flights to Lisbon",
+      "list": "personal",
+      "remindAt": null,
+      "dueAt": "2026-12-04",
+      "grocery": null,
+      "confidence": 0.85
+     }
+    ]
+   }
+  },
+  {
+   "text": "huur overmaken uiterlijk de 30e",
+   "output": {
+    "items": [
+     {
+      "title": "huur overmaken",
+      "list": "personal",
+      "remindAt": null,
+      "dueAt": "2026-11-30",
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "kwartaalrapport afmaken deadline 1 december, herinner me maandagochtend",
+   "output": {
+    "items": [
+     {
+      "title": "kwartaalrapport afmaken",
+      "list": "work",
+      "remindAt": "2026-11-30T07:45:00+01:00",
+      "dueAt": "2026-12-01",
+      "grocery": null,
+      "confidence": 0.92
+     }
+    ]
+   }
+  },
+  {
+   "text": "review PR van Daan before lunch tomorrow",
+   "output": {
+    "items": [
+     {
+      "title": "review PR van Daan",
+      "list": "work",
+      "remindAt": "2026-11-27T13:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.8
+     }
+    ]
+   }
+  },
+  {
+   "text": "sprint review slides maken en morgen 10:00 standup niet vergeten",
+   "output": {
+    "items": [
+     {
+      "title": "sprint review slides maken",
+      "list": "work",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     },
+     {
+      "title": "standup",
+      "list": "work",
+      "remindAt": "2026-11-27T10:00:00+01:00",
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.9
+     }
+    ]
+   }
+  },
+  {
+   "text": "nieuwe serie kijken: Severance",
+   "output": {
+    "items": [
+     {
+      "title": "nieuwe serie kijken: Severance",
+      "list": "personal",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.85
+     }
+    ]
+   }
+  },
+  {
+   "text": "bellen en afspraak maken met de fysio",
+   "output": {
+    "items": [
+     {
+      "title": "bellen en afspraak maken met de fysio",
+      "list": "personal",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.93
+     }
+    ]
+   }
+  },
+  {
+   "text": "fgdh",
+   "output": {
+    "items": [
+     {
+      "title": "fgdh",
+      "list": "personal",
+      "remindAt": null,
+      "dueAt": null,
+      "grocery": null,
+      "confidence": 0.1
+     }
+    ]
+   }
+  }
+ ]
+}

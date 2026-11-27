@@ -1,5 +1,5 @@
 {
-  "_note": "Tool inputs in the exact shape the model is asked to produce. Hand-written to the contract for M3; replace with recorded ones from the eval workflow's artifact when tuning the prompt.",
+  "_note": "Hand-written edge cases for the output contract: tolerated sloppiness and everything that must be rejected. Real model answers are in recorded.json.",
   "valid": [
     {
       "name": "single personal reminder, vague time",

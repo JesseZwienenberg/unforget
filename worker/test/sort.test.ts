@@ -19,6 +19,39 @@ const fixtures = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', '
   invalid: { name: string; output: unknown }[];
 };
 
+const recorded = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'llm', 'recorded.json'), 'utf8')) as {
+  recorded: { text: string; output: unknown }[];
+};
+
+describe('real recorded model answers', () => {
+  it('has a recording for a good spread of captures', () => {
+    expect(recorded.recorded.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it.each(recorded.recorded)('validates: $text', ({ output }) => {
+    const items = parseSortOutput(output, S);
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item.title).not.toBe('');
+      if (item.remindAt) expect(item.remindAt).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:00\.000Z$/);
+      if (item.list === 'groceries') expect(S.grocerySections).toContain(item.grocery!.section);
+      else expect(item.grocery).toBeNull();
+    }
+  });
+
+  it('turns a recorded answer into the right stored values', () => {
+    const find = (text: string) => parseSortOutput(recorded.recorded.find((r) => r.text === text)!.output, S);
+    expect(find('morgen om 9 uur garage bellen')[0]).toMatchObject({ list: 'personal', remindAt: '2026-11-27T08:00:00.000Z', dueAt: null });
+    expect(find('voor vrijdag declaraties indienen')[0]).toMatchObject({ list: 'work', remindAt: null, dueAt: '2026-11-27' });
+    expect(find('half 4 Lisa ophalen van school')[0]).toMatchObject({ remindAt: '2026-11-26T14:30:00.000Z' });
+    expect(find('kaas, yoghurt en 2 komkommers').map((i) => [i.grocery!.canonicalName, i.grocery!.quantity, i.grocery!.section])).toEqual([
+      ['cheese', null, 'Cheese & deli'],
+      ['yogurt', null, 'Dairy & eggs'],
+      ['cucumber', 2, 'Fruit & vegetables'],
+    ]);
+  });
+});
+
 describe('model output validation (fixtures)', () => {
   it.each(fixtures.valid)('accepts: $name', ({ output, expected }) => {
     expect(parseSortOutput(output, S)).toEqual(expected);
