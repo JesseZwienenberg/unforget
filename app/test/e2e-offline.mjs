@@ -38,11 +38,16 @@ try {
     ],
   };
   await cdp.send('ServiceWorker.deliverPushMessage', { origin: 'http://localhost:4173', registrationId, data: JSON.stringify(push) });
-  await page.waitForFunction(async () => (await (await navigator.serviceWorker.ready).getNotifications()).length === 1, null, { timeout: 5000 });
-  const shown = await page.evaluate(async () => {
-    const [n] = await (await navigator.serviceWorker.ready).getNotifications();
-    return { title: n.title, body: n.body, tag: n.tag, itemId: n.data.itemId, actions: n.actions.map((a) => a.action) };
-  });
+  // Read it in the same step that finds it: some environments close notifications right away.
+  const handle = await page.waitForFunction(
+    async () => {
+      const [n] = await (await navigator.serviceWorker.ready).getNotifications();
+      return n ? { title: n.title, body: n.body, tag: n.tag, itemId: n.data.itemId, actions: n.actions.map((a) => a.action) } : null;
+    },
+    null,
+    { timeout: 5000 },
+  );
+  const shown = await handle.jsonValue();
   const expected = { title: 'oven uit', body: '⏰ 14:13 · Personal', tag: 'item-1', itemId: '1', actions: ['done', 'snooze:1h'] };
   if (JSON.stringify(shown) !== JSON.stringify(expected)) throw new Error(`notification was ${JSON.stringify(shown)}`);
 
