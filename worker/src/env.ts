@@ -11,4 +11,8 @@ export interface Env {
   /** Secrets: the Web Push key pair. The public half is handed to the app. */
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
+  /** Secret: Anthropic API key for sorting. Never sent to the browser. */
+  ANTHROPIC_API_KEY?: string;
+  /** Only for tests: where to reach the Anthropic API. */
+  ANTHROPIC_BASE_URL?: string;
 }

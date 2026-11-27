@@ -5,6 +5,8 @@ import { corsHeaders, json, withHeaders } from './http';
 import { createSender, deleteSubscription, listSubscriptions, pushConfigured, saveSubscription, sendToAll } from './push';
 import { deliverDueReminders } from './reminders';
 import { loadSettings } from './settings';
+import { sortCapture, sortPending, type SortDeps } from './sort/apply';
+import { createSorter } from './sort/llm';
 import { sync } from './sync';
 import { testPayload } from '../../shared/src/notify';
 import { parseSyncRequest } from '../../shared/src/validate';
@@ -44,7 +46,20 @@ async function health(env: Env): Promise<Response> {
     schema,
     tokenConfigured: Boolean(env.APP_TOKEN),
     pushConfigured: pushConfigured(env),
+    llmConfigured: Boolean(env.ANTHROPIC_API_KEY),
   });
+}
+
+/** Total time a sync request may spend waiting for the sorter before answering with provisional items. */
+const INLINE_SORT_MS = 3500;
+const INLINE_SORT_MAX = 3;
+const CRON_SORT_MS = 20_000;
+const CRON_SORT_MAX = 3;
+
+async function sortDeps(env: Env, now: Date): Promise<SortDeps | null> {
+  if (!env.ANTHROPIC_API_KEY) return null;
+  const settings = await loadSettings(env.DB);
+  return settings.llm.enabled ? { db: env.DB, sorter: createSorter(env), settings, now } : null;
 }
 
 async function handleSync(request: Request, env: Env, ctx: ExecutionContext | undefined): Promise<Response> {
@@ -53,7 +68,25 @@ async function handleSync(request: Request, env: Env, ctx: ExecutionContext | un
   const now = new Date();
   const parsed = parseSyncRequest(body, now);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
-  const response = await sync(env.DB, parsed.value, now);
+  let response = await sync(env.DB, parsed.value, now);
+
+  // Sort brand-new captures now, so the answer already holds the real items. If the
+  // model is slow the request answers with the provisional ones and the cron finishes the job.
+  const fresh = parsed.value.captures.filter((c) => !c.deletedAt).slice(0, INLINE_SORT_MAX);
+  if (fresh.length) {
+    const deps = await sortDeps(env, now);
+    if (deps) {
+      const outcomes = await Promise.all(
+        fresh.map((c) =>
+          sortCapture(deps, c.id, INLINE_SORT_MS).catch((err) => {
+            console.error('inline sort', err);
+            return 'failed' as const;
+          }),
+        ),
+      );
+      if (outcomes.includes('sorted')) response = await sync(env.DB, { since: parsed.value.since, captures: [], items: [], settings: null }, now);
+    }
+  }
   // A reminder that was already due when it arrived (the phone was offline) goes
   // out right away instead of waiting for the next cron minute.
   const stamp = now.toISOString();
@@ -143,9 +176,16 @@ async function route(request: Request, env: Env, ctx: ExecutionContext | undefin
 
 /** Everything that runs on the per-minute cron. */
 export async function runCron(env: Env, now: Date): Promise<void> {
-  if (!pushConfigured(env)) return;
-  const report = await deliverDueReminders(env.DB, createSender(env), now);
-  if (report.due) console.log('reminders', JSON.stringify(report));
+  // Reminders first: they are time-critical, sorting is not.
+  if (pushConfigured(env)) {
+    const report = await deliverDueReminders(env.DB, createSender(env), now);
+    if (report.due) console.log('reminders', JSON.stringify(report));
+  }
+  const deps = await sortDeps(env, now);
+  if (deps) {
+    const tally = await sortPending(deps, CRON_SORT_MAX, CRON_SORT_MS);
+    if (tally.sorted || tally.failed || tally.capped) console.log('sorting', JSON.stringify(tally));
+  }
 }
 
 export default {

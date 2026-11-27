@@ -60,6 +60,23 @@
   </section>
 
   <section>
+    <h3>Smart sorting</h3>
+    <label class="toggle">
+      <input
+        type="checkbox"
+        checked={app.settings.llm.enabled}
+        onchange={(e) => app.updateSettings((s) => ({ ...s, llm: { ...s.llm, enabled: e.currentTarget.checked } }))}
+      />
+      <span>Sort captures automatically</span>
+    </label>
+    <p class="muted">
+      {app.settings.llm.enabled
+        ? 'Captures are split, filed and timed by Claude Haiku on the server. Prefixes (w, p, g) always win.'
+        : 'Off: captures stay as typed, under Personal unless you use a prefix (w, p, g).'}
+    </p>
+  </section>
+
+  <section>
     <h3>Your data</h3>
     <p class="muted">Downloads every capture and item on this device, including done and deleted ones.</p>
     <button type="button" onclick={() => app.exportEverything()}>Export everything (JSON)</button>
@@ -91,6 +108,17 @@
   .muted {
     color: var(--muted);
     font-size: 0.9rem;
+  }
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+  }
+  .toggle input {
+    width: 1.4rem;
+    height: 1.4rem;
+    accent-color: var(--accent);
   }
   .note {
     margin-top: 0.6rem;

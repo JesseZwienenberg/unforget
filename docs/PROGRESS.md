@@ -3,17 +3,19 @@
 ## Done
 
 - **M0 – Bootstrap** (accepted 26 Nov 2026).
-- **M1 – Capture** (accepted 27 Nov 2026). Phone test passed. One finding: the keyboard does not open by itself on a cold start (it does when returning to the app); handled with tap-anywhere-to-type, see DECISIONS.
+- **M1 – Capture** (accepted 27 Nov 2026). Finding: no automatic keyboard on a cold start; handled with tap-anywhere-to-type.
 
 ## In progress
 
-**M2 – Reminders**: built and deployed; waiting for Jesse's phone tests.
+**M2 – Reminders**: deployed 27 Nov; Jesse said "proceed" before reporting on the phone tests (the overnight one could not have run yet). Treat M2 as not yet confirmed: ask for the results.
 
-What exists:
-- Worker: Web Push (VAPID, Urgency high, TTL 12 h), `push_subscriptions` (migration 0003), per-minute cron, claim-then-send with `notifiedAt`, late and stale handling, `POST /v1/items/:id/action` for notification buttons, push key/subscribe/unsubscribe/test endpoints.
-- App: turn-on-notifications banner and More section with test button, service worker push + notification buttons (Done, Snooze 1h) + tap-to-open, snooze sheet, "not scheduled yet: offline" warning, tap anywhere to focus the box.
-- Docs: `docs/PHONE.md` (Samsung checklist).
-- Tests: 218 unit tests (reminder selection, idempotency, late, snooze presets across DST, push encryption round trip); Chrome e2e covers snooze sheet, warnings, action endpoint and the push handler.
+**M3 – LLM sorting**: built and deployed; waiting for Jesse's phone test.
+
+What exists for M3:
+- Worker: `worker/src/sort/` (prompt + forced tool for `claude-haiku-5-5`, output validation, claim → call → settle → apply, grocery merge, retries with backoff, daily cap), migration `0004_sorting.sql`, sorting inside the sync request (3.5 s limit) and in the cron.
+- App: toast refreshes when the sorted result arrives; "Sort captures automatically" switch in the More sheet.
+- Evals: `evals/cases.ts` (32 cases), `evals/sorting.eval.ts`, workflow "Eval sorting" (manual).
+- Tests: unit tests on real SQLite for sorting, merging, retries, cap; Chrome e2e with a stand-in model.
 
 Live addresses:
 - App: https://jessezwienenberg.github.io/unforget/
@@ -21,12 +23,13 @@ Live addresses:
 
 ## Exact next step
 
-1. Jesse does the Samsung checklist and the three M2 phone tests ("over 2 min test" with the phone locked; 30 minutes ahead with the phone idle; overnight at 07:45) and reports back.
-2. Fix whatever he reports (delivery problems: start from the "Send a test notification" message).
-3. On his OK: mark M2 done here and start M3 (LLM sorting). First M3 tasks: Jesse adds the `ANTHROPIC_API_KEY` secret (SETUP.md step 5); design the prompt and tool schema for `claude-haiku-5-5`; `llm_usage` migration; sorting inside sync with a timeout; cron retries; eval set and workflow.
+1. Run the "Eval sorting" workflow against the real API, read the mismatches, tune `worker/src/sort/prompt.ts`, and replace the hand-written fixtures with recorded answers. (See the latest chat message for whether this has been done.)
+2. Jesse does the M3 phone test (list of captures with expected results) and reports on the M2 tests.
+3. Fix what he reports.
+4. On his OK: mark M2 and M3 done here and start M4 (self-cleaning, digest, settings screen). First M4 tasks: fading rules as a pure function with tests, nightly job inside the cron at 03:00 local, digest content + push, settings screen.
 
 ## Known issues
 
-- Real push delivery (through Google's push service to the phone) has only been tested up to the encrypted request; the phone tests are the first full run.
+- Real push delivery and real model answers are only fully proven by the phone tests and the eval workflow.
+- Undo after a grocery merge does not lower the merged quantity again.
 - An already-installed app picks up the share target only after Chrome refreshes the install (up to a day) or after reinstalling.
-- Without a prefix everything lands in Personal until M3.

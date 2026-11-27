@@ -17,7 +17,7 @@ function fakeDb(schema: string | null, fail = false): D1Database {
 }
 
 function env(overrides: Partial<Env> = {}): Env {
-  return { DB: fakeDb('m2'), ALLOWED_ORIGINS: ORIGIN, APP_TOKEN: 'secret-token', VERSION: 'abc123', ...overrides };
+  return { DB: fakeDb('m3'), ALLOWED_ORIGINS: ORIGIN, APP_TOKEN: 'secret-token', VERSION: 'abc123', ...overrides };
 }
 
 function call(path: string, init: RequestInit = {}, e: Env = env()): Promise<Response> {
@@ -28,7 +28,7 @@ describe('health', () => {
   it('is public and reports the database and version', async () => {
     const res = await call('/health');
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, service: 'unforget', version: 'abc123', db: 'ok', schema: 'm2', tokenConfigured: true });
+    expect(await res.json()).toMatchObject({ ok: true, service: 'unforget', version: 'abc123', db: 'ok', schema: 'm3', tokenConfigured: true });
   });
 
   it('reports a broken database without crashing', async () => {

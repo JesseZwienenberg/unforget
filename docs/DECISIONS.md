@@ -86,6 +86,32 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 - The cron and VAPID subject are in `wrangler.jsonc`; the smoke test now fails if the VAPID secrets are missing on the Worker.
 - The service worker's push handler is tested in real Chrome by delivering a push through DevTools; the encrypted hop through Google's push service can only be tested on the phone.
 
+## M3
+
+- No `temperature` is sent, although the spec says temperature 0: Anthropic's documentation for Claude Haiku 5.5 says to omit sampling parameters for this model. Reported to Jesse.
+- Forced tool use (`tool_choice` naming the `file_items` tool) without `strict`: the forced call is the long-established path and returns JSON immediately (a forced call also skips the model's thinking, which keeps it fast). Strict mode's supported schema subset could not be verified from the workspace, and the output is validated by our own code anyway.
+- The Anthropic API is called with plain `fetch`, no SDK: one request shape, and it keeps the Worker small.
+- The model is told to write local wall-clock times; the offset it writes is ignored and the wall clock is interpreted in the user's time zone (an explicit `Z` is taken as UTC): models get daylight-saving offsets wrong but get "09:00 that day" right.
+- The user message contains a 15-day calendar with weekday names: the model reads dates off a list instead of calculating them.
+- All times are relative to the capture time, not to when sorting runs: a retry hours later gives the same result.
+- The phone's relative-time result is passed to the model and then enforced by code: a single item always keeps the device's exact `remindAt`; with several items, the one within 2 minutes of it is snapped to it.
+- A prefix (w/p/g) is stripped before the model sees the text, and the list is enforced by code afterwards, for every item of that capture.
+- Confidence below 0.6 → Personal, marked unsorted (never when a prefix fixed the list).
+- The first sorted item takes over the provisional item's id; further items get ids derived from the capture id and position (SHA-256), and `createdAt` one millisecond apart: retries write the same rows, and items keep their written order on every device.
+- A capture whose provisional item was edited, ticked off or deleted by the user is marked sorted without calling the model: a manual fix is never overwritten.
+- When the server replaces the provisional item, its `updatedAt` is set later than the device's copy even if the phone's clock runs ahead: otherwise last-write-wins would keep the provisional one.
+- Grocery merge: a new grocery whose canonical name matches an open grocery raises that line's quantity (a missing quantity counts as 1) and no new line is created; the provisional item is soft-deleted. Ticked-off groceries are not merged into: buying it again is a new line.
+- Sorting is claimed per capture (`sort_status = 'sorting'` with a 2-minute lease) before the model is called: the sync request and the cron can't both sort it, which matters because a grocery merge is not idempotent.
+- Inside the sync request, up to 3 new captures are sorted in parallel with a 3.5-second limit; on timeout or error the response carries the provisional items and the cron retries after 1, 2, 5, 15, 60 and 360 minutes, then marks the capture failed (the provisional item simply stays).
+- The daily cap counts calls in `llm_usage` per local date with one atomic statement; at the cap, captures wait (without using up an attempt) and are picked up after midnight.
+- Unknown grocery sections from the model fall back to "Other" rather than failing the sort.
+- The toast updates when the sorted result arrives ("Saved → 3 items · …"); Undo still removes everything the capture produced, except a quantity that was merged into an existing grocery line.
+- "Sort captures automatically" switch lives in the More sheet for now; the full settings screen is M4.
+- Model output fixtures in `worker/test/fixtures/llm/outputs.json` are hand-written to the contract; real recorded answers come from the eval workflow's artifact.
+- Evals run through Vitest with their own config (`vitest.eval.config.ts`) so they can import the Worker's real prompt and validation code; they are never part of CI.
+- `ANTHROPIC_BASE_URL` exists only so the end-to-end test can point the Worker at a stand-in model.
+- Cost: about 2,500 input and 150 output tokens per capture at $0.10 / $0.50 per million tokens is roughly $0.0003 per capture; the 300-per-day cap bounds it at about 10 cents a day.
+
 ## Later
 
 Nothing yet.

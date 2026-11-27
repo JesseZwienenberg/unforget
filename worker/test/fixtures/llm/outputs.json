@@ -1,0 +1,76 @@
+{
+  "_note": "Tool inputs in the exact shape the model is asked to produce. Hand-written to the contract for M3; replace with recorded ones from the eval workflow's artifact when tuning the prompt.",
+  "valid": [
+    {
+      "name": "single personal reminder, vague time",
+      "output": { "items": [{ "title": "tandarts bellen voor afspraak", "list": "personal", "remindAt": "2026-11-27T07:45:00+01:00", "dueAt": null, "grocery": null, "confidence": 0.93 }] },
+      "expected": [{ "title": "tandarts bellen voor afspraak", "list": "personal", "remindAt": "2026-11-27T06:45:00.000Z", "dueAt": null, "grocery": null, "confidence": 0.93 }]
+    },
+    {
+      "name": "grocery list split in three with a quantity",
+      "output": {
+        "items": [
+          { "title": "melk", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "milk", "displayName": "melk", "quantity": null, "section": "Dairy & eggs" }, "confidence": 0.97 },
+          { "title": "brood", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "bread", "displayName": "brood", "quantity": null, "section": "Bread & bakery" }, "confidence": 0.97 },
+          { "title": "eieren", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "Egg", "displayName": "eieren", "quantity": 6, "section": "Dairy & eggs" }, "confidence": 0.97 }
+        ]
+      },
+      "expected": [
+        { "title": "melk", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "milk", "displayName": "melk", "quantity": null, "section": "Dairy & eggs" }, "confidence": 0.97 },
+        { "title": "brood", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "bread", "displayName": "brood", "quantity": null, "section": "Bread & bakery" }, "confidence": 0.97 },
+        { "title": "eieren", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "egg", "displayName": "eieren", "quantity": 6, "section": "Dairy & eggs" }, "confidence": 0.97 }
+      ]
+    },
+    {
+      "name": "work deadline as a date",
+      "output": { "items": [{ "title": "send Q4 report to Anna", "list": "work", "remindAt": null, "dueAt": "2026-11-27", "grocery": null, "confidence": 0.92 }] },
+      "expected": [{ "title": "send Q4 report to Anna", "list": "work", "remindAt": null, "dueAt": "2026-11-27", "grocery": null, "confidence": 0.92 }]
+    },
+    {
+      "name": "deadline with a clock time, and a reminder on the same item",
+      "output": { "items": [{ "title": "offerte versturen", "list": "work", "remindAt": "2026-11-30T09:00:00+01:00", "dueAt": "2026-11-30T17:00:00+01:00", "grocery": null, "confidence": 0.9 }] },
+      "expected": [{ "title": "offerte versturen", "list": "work", "remindAt": "2026-11-30T08:00:00.000Z", "dueAt": "2026-11-30T16:00:00.000Z", "grocery": null, "confidence": 0.9 }]
+    },
+    {
+      "name": "summer date written with the winter offset: the wall clock wins",
+      "output": { "items": [{ "title": "APK auto", "list": "personal", "remindAt": "2027-06-15T09:00:00+01:00", "dueAt": null, "grocery": null, "confidence": 0.9 }] },
+      "expected": [{ "title": "APK auto", "list": "personal", "remindAt": "2027-06-15T07:00:00.000Z", "dueAt": null, "grocery": null, "confidence": 0.9 }]
+    },
+    {
+      "name": "tolerated sloppiness: no seconds, no offset, extra spaces, unknown section, confidence out of range, grocery on a non-grocery",
+      "output": {
+        "items": [
+          { "title": "  call   mom ", "list": "personal", "remindAt": "2026-11-26T20:00", "dueAt": null, "grocery": { "canonicalName": "x", "displayName": "x", "quantity": null, "section": "Other" }, "confidence": 1.4 },
+          { "title": "ignored when grocery has a name", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "dragon fruit", "displayName": "drakenfruit", "quantity": 2, "section": "Exotic" }, "confidence": 0.8 }
+        ]
+      },
+      "expected": [
+        { "title": "call mom", "list": "personal", "remindAt": "2026-11-26T19:00:00.000Z", "dueAt": null, "grocery": null, "confidence": 1 },
+        { "title": "drakenfruit", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "dragon fruit", "displayName": "drakenfruit", "quantity": 2, "section": "Other" }, "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "explicit UTC is taken literally",
+      "output": { "items": [{ "title": "launch", "list": "work", "remindAt": "2026-11-27T09:00:00Z", "dueAt": null, "grocery": null, "confidence": 0.9 }] },
+      "expected": [{ "title": "launch", "list": "work", "remindAt": "2026-11-27T09:00:00.000Z", "dueAt": null, "grocery": null, "confidence": 0.9 }]
+    },
+    {
+      "name": "no items",
+      "output": { "items": [] },
+      "expected": []
+    }
+  ],
+  "invalid": [
+    { "name": "not an object", "output": "melk" },
+    { "name": "items missing", "output": { "result": [] } },
+    { "name": "unknown list", "output": { "items": [{ "title": "x", "list": "inbox", "remindAt": null, "dueAt": null, "grocery": null, "confidence": 0.9 }] } },
+    { "name": "empty title", "output": { "items": [{ "title": "  ", "list": "personal", "remindAt": null, "dueAt": null, "grocery": null, "confidence": 0.9 }] } },
+    { "name": "time in words", "output": { "items": [{ "title": "x", "list": "personal", "remindAt": "tomorrow morning", "dueAt": null, "grocery": null, "confidence": 0.9 }] } },
+    { "name": "impossible date", "output": { "items": [{ "title": "x", "list": "personal", "remindAt": "2026-02-30T09:00:00+01:00", "dueAt": null, "grocery": null, "confidence": 0.9 }] } },
+    { "name": "impossible due date", "output": { "items": [{ "title": "x", "list": "work", "remindAt": null, "dueAt": "2026-13-01", "grocery": null, "confidence": 0.9 }] } },
+    { "name": "confidence as text", "output": { "items": [{ "title": "x", "list": "personal", "remindAt": null, "dueAt": null, "grocery": null, "confidence": "high" }] } },
+    { "name": "quantity as text", "output": { "items": [{ "title": "melk", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "canonicalName": "milk", "displayName": "melk", "quantity": "two", "section": "Dairy & eggs" }, "confidence": 0.9 }] } },
+    { "name": "grocery without a name", "output": { "items": [{ "title": "melk", "list": "groceries", "remindAt": null, "dueAt": null, "grocery": { "displayName": "melk", "quantity": null, "section": "Dairy & eggs" }, "confidence": 0.9 }] } },
+    { "name": "time as a number", "output": { "items": [{ "title": "x", "list": "personal", "remindAt": 1795784013, "dueAt": null, "grocery": null, "confidence": 0.9 }] } }
+  ]
+}

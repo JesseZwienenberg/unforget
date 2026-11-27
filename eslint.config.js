@@ -22,7 +22,7 @@ export default ts.config(
     languageOptions: { parserOptions: { parser: ts.parser } },
   },
   {
-    files: ['scripts/**', 'app/build/**', 'app/test/**', 'app/vite.config.ts', '*.config.js'],
+    files: ['scripts/**', 'evals/**', 'app/build/**', 'app/test/**', 'app/vite.config.ts', '*.config.js'],
     languageOptions: { globals: globals.node },
   },
   {

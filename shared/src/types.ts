@@ -8,7 +8,7 @@ export const LIST_NAMES: Record<ListId, string> = { work: 'Work', personal: 'Per
 export type ItemStatus = 'open' | 'done' | 'archived';
 export type CaptureSource = 'typed' | 'share';
 /** Server-owned: where the capture is in LLM sorting. */
-export type SortStatus = 'pending' | 'sorted' | 'failed';
+export type SortStatus = 'pending' | 'sorting' | 'sorted' | 'failed';
 
 export interface Capture {
   id: string;

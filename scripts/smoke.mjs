@@ -42,6 +42,7 @@ if (!health) {
   check('database reachable and migrated', body.ok === true && body.db === 'ok', `db=${body.db} schema=${body.schema}`);
   check('app token is configured on the Worker', body.tokenConfigured === true);
   check('push keys are configured on the Worker (VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY secrets)', body.pushConfigured === true);
+  check('Anthropic API key is configured on the Worker (ANTHROPIC_API_KEY secret)', body.llmConfigured === true);
   check('CORS allows the app origin', res.headers.get('access-control-allow-origin') === origin);
 
   const evil = await fetch(`${base}/health`, { headers: { origin: 'https://example.com' } });

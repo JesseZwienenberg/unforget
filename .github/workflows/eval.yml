@@ -1,0 +1,31 @@
+name: Eval sorting
+
+# Runs the eval set (evals/cases.ts) against the real Anthropic API and reports
+# mismatches in the run summary. Started by hand only. Costs well under a cent.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run the eval set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npx vitest run --config vitest.eval.config.ts
+      - name: Keep the raw model answers
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: eval-results
+          path: evals/out/
+          if-no-files-found: ignore

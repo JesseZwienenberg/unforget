@@ -22,6 +22,8 @@ export interface Toast {
   warning?: string | null;
   /** Tapping the toast opens this item for a quick fix. */
   itemId: string | null;
+  /** The capture this toast is about, so it can be refreshed when the sorter answers. */
+  captureId?: string;
   undo: (() => void) | null;
 }
 
@@ -262,10 +264,26 @@ class App {
       text: this.savedText(item),
       warning: item.remindAt ? this.offlineWarning() : null,
       itemId: item.id,
+      captureId: capture.id,
       undo: () => void this.undoCapture(capture.id),
     });
     await this.storage.saveCapture(capture, [item]);
     this.afterWrite();
+  }
+
+  /** The sorter answered while the toast is still up: show what the capture became. */
+  private refreshToast(): void {
+    const toast = this.toast;
+    if (!toast?.captureId) return;
+    const items = this.items.filter((i) => i.captureId === toast.captureId).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    const first = items.find((i) => i.id === toast.itemId) ?? items[0];
+    const text = !first
+      ? 'Saved → Groceries · already on the list, quantity raised'
+      : items.length === 1
+        ? this.savedText(first)
+        : `Saved → ${items.length} items · ${[first, ...items.filter((i) => i !== first)].map((i) => i.title).join(' · ')}`;
+    if (text === toast.text) return;
+    this.showToast({ ...toast, text, itemId: first?.id ?? null });
   }
 
   private savedText(item: Item): string {
@@ -382,6 +400,7 @@ class App {
           const [items, settings] = await Promise.all([this.storage.loadItems(), this.storage.loadSettings()]);
           this.items = items;
           if (settings) this.settings = settings.value;
+          this.refreshToast();
           this.openWanted();
         }
       } while (this.syncAgain);
@@ -400,6 +419,16 @@ class App {
       this.syncing = false;
       await this.refreshOutbox();
     }
+  }
+
+  // ---- settings ----------------------------------------------------------
+
+  /** Changes settings on this device and queues them for sync to the server and other devices. */
+  async updateSettings(change: (current: Settings) => Settings): Promise<void> {
+    const value = change(this.settings);
+    this.settings = value;
+    await this.storage.saveSettings({ value, updatedAt: new Date().toISOString() });
+    this.afterWrite();
   }
 
   // ---- export ------------------------------------------------------------

@@ -207,6 +207,6 @@ describe('POST /v1/sync', () => {
 
   it('health reports the current schema', async () => {
     const res = await worker.fetch(new Request('https://w.example/health'), env());
-    expect(await res.json()).toMatchObject({ ok: true, schema: 'm2' });
+    expect(await res.json()).toMatchObject({ ok: true, schema: 'm3' });
   });
 });

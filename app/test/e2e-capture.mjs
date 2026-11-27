@@ -2,6 +2,7 @@
 // with a local D1): capture offline on a "phone", come back online, see it on a
 // "laptop". Also: toast fix and undo, share target, export. `npm run e2e -w app`.
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -38,9 +39,30 @@ if (migrate.status !== 0) {
   console.error(migrate.stdout, migrate.stderr);
   process.exit(1);
 }
+// A stand-in for the Anthropic API. It answers only captures that start with "sorteer",
+// so the rest of this test keeps exercising the provisional (model unavailable) path.
+const modelCalls = [];
+const model = createServer((req, res) => {
+  let body = '';
+  req.on('data', (d) => (body += d));
+  req.on('end', () => {
+    const request = JSON.parse(body);
+    const capture = /<capture>\n([\s\S]*)\n<\/capture>/.exec(request.messages[0].content)?.[1] ?? '';
+    modelCalls.push({ capture, key: req.headers['x-api-key'], model: request.model });
+    if (!capture.startsWith('sorteer')) {
+      res.writeHead(529).end('overloaded');
+      return;
+    }
+    const item = (title, extra) => ({ title, list: 'personal', remindAt: null, dueAt: null, grocery: null, confidence: 0.95, ...extra });
+    const grocery = (name, canonicalName, section) => item(name, { list: 'groceries', grocery: { canonicalName, displayName: name, quantity: null, section } });
+    const items = [grocery('melk', 'milk', 'Dairy & eggs'), grocery('brood', 'bread', 'Bread & bakery'), item('tandarts bellen', { remindAt: '2030-01-07T07:45:00+01:00' })];
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ content: [{ type: 'tool_use', id: 't1', name: 'file_items', input: { items } }] }));
+  });
+}).listen(8788);
+
 const wrangler = spawn(
   'npx',
-  ['wrangler', 'dev', '--port', '8787', '--persist-to', state, '--var', `APP_TOKEN:${TOKEN}`, '--var', 'ALLOWED_ORIGINS:http://localhost:4173', '--var', 'VERSION:e2e'],
+  ['wrangler', 'dev', '--port', '8787', '--persist-to', state, '--var', `APP_TOKEN:${TOKEN}`, '--var', 'ALLOWED_ORIGINS:http://localhost:4173', '--var', 'VERSION:e2e', '--var', 'ANTHROPIC_API_KEY:e2e-key', '--var', 'ANTHROPIC_BASE_URL:http://localhost:8788'],
   { ...quiet, stdio: ['ignore', 'pipe', 'pipe'], detached: true },
 );
 let workerLog = '';
@@ -180,6 +202,42 @@ try {
   await phone.tab('Personal');
   await gone(phone.page, 'oven uit');
 
+  step('smart sorting: one capture becomes three sorted items, and the toast follows');
+  await phone.tab('Today');
+  await phone.capture('sorteer melk, brood en maandag tandarts bellen');
+  await phone.page.getByText('Saved → 3 items · melk · brood · tandarts bellen').waitFor({ timeout: 10000 });
+  await phone.tab('Groceries');
+  await phone.page.getByRole('heading', { name: 'Dairy & eggs' }).waitFor({ timeout: 5000 });
+  await phone.page.getByRole('heading', { name: 'Bread & bakery' }).waitFor({ timeout: 5000 });
+  await phone.page.getByLabel('Mark done: melk').waitFor({ timeout: 5000 });
+  await phone.tab('Personal');
+  await see(phone.page, 'tandarts bellen');
+  await phone.page.getByText('⏰ Mon 7 Jan 2030 07:45').waitFor({ timeout: 5000 });
+  const sortCall = modelCalls.find((c) => c.capture.startsWith('sorteer'));
+  if (sortCall?.key !== 'e2e-key' || sortCall?.model !== 'claude-haiku-5-5') throw new Error(`unexpected model call: ${JSON.stringify(sortCall)}`);
+
+  step('smart sorting: the same grocery again raises the quantity instead of adding a line');
+  await phone.capture('sorteer melk, brood en maandag tandarts bellen');
+  await phone.synced();
+  await phone.tab('Groceries');
+  await phone.page.getByLabel('Mark done: melk × 2').waitFor({ timeout: 10000 });
+  if ((await phone.page.getByLabel(/^Mark done: melk/).count()) !== 1) throw new Error('duplicate grocery line');
+
+  step('smart sorting: switched off, the model is not called');
+  await phone.status.click();
+  await phone.page.getByLabel('Sort captures automatically').uncheck();
+  await phone.page.keyboard.press('Escape');
+  await phone.synced();
+  const before = modelCalls.length;
+  await phone.capture('sorteer dit niet');
+  await phone.synced();
+  await phone.page.waitForTimeout(500);
+  if (modelCalls.length !== before) throw new Error('model was called while sorting is off');
+  await phone.status.click();
+  await phone.page.getByLabel('Sort captures automatically').check();
+  await phone.page.keyboard.press('Escape');
+  await phone.synced();
+
   step('share target: shared text is saved as a capture');
   await phone.page.goto(`${APP}?share_title=Recept&share_text=${encodeURIComponent('Recept https://example.com/pasta')}`);
   await phone.page.getByText('Saved → Personal · Recept https://example.com/pasta').waitFor({ timeout: 5000 });
@@ -192,7 +250,7 @@ try {
   await phone.status.click();
   const [download] = await Promise.all([phone.page.waitForEvent('download'), phone.page.getByRole('button', { name: 'Export everything (JSON)' }).click()]);
   const data = JSON.parse(readFileSync(await download.path(), 'utf8'));
-  if (data.captures.length !== 6 || data.items.length !== 6) throw new Error(`export has ${data.captures.length} captures, ${data.items.length} items`);
+  if (data.captures.length !== 9) throw new Error(`export has ${data.captures.length} captures`);
   if (!data.captures.some((c) => c.text === 'p vergissing' && c.deletedAt)) throw new Error('export lost the undone capture');
   if (!data.captures.some((c) => c.text === 'G Ketchup')) throw new Error('raw capture text was changed');
 
@@ -210,6 +268,7 @@ try {
 } finally {
   await browser.close();
   await new Promise((resolve) => server.httpServer.close(resolve));
+  model.close();
   try {
     process.kill(-wrangler.pid, 'SIGTERM');
   } catch {

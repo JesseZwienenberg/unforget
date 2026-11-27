@@ -271,7 +271,7 @@ describe('HTTP', () => {
 
   it('health says whether push is configured', async () => {
     const on = await worker.fetch(new Request('https://w.example/health'), env());
-    expect(await on.json()).toMatchObject({ pushConfigured: true, schema: 'm2' });
+    expect(await on.json()).toMatchObject({ pushConfigured: true, schema: 'm3' });
     const off = await worker.fetch(new Request('https://w.example/health'), env({ VAPID_PRIVATE_KEY: undefined }));
     expect(await off.json()).toMatchObject({ pushConfigured: false });
   });

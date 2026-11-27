@@ -5,8 +5,9 @@ The app splits it into items, files them under Work, Personal or Groceries, and 
 time it finds into a reminder. Nothing needs organising: items with a time remind you,
 items without one quietly fade away.
 
-**Status:** M2 (reminders). Capturing, lists, sync, share target, export and reminder
-notifications work; smart sorting comes in M3. See [docs/PROGRESS.md](docs/PROGRESS.md).
+**Status:** M3 (smart sorting). Capturing, sync, reminders and automatic sorting work;
+self-cleaning, the morning digest and the settings screen come in M4. See
+[docs/PROGRESS.md](docs/PROGRESS.md).
 
 - App: https://jessezwienenberg.github.io/unforget/
 - Full specification: [docs/SPEC.md](docs/SPEC.md)
@@ -47,6 +48,20 @@ notification has two buttons, Done and Snooze 1h, which work without opening the
 tapping the notification opens a snooze sheet. A reminder that reaches the server after its
 time is sent at once, marked late. Phone settings that matter: [docs/PHONE.md](docs/PHONE.md).
 
+## Sorting
+
+New captures are sorted on the server by Claude Haiku (`claude-haiku-5-5`): split into
+items, filed under Work, Personal or Groceries, titles cleaned (never translated), times
+extracted, groceries given a canonical name, quantity and section. The model must answer
+through a forced tool call and its answer is validated before anything is stored. Sorting
+happens inside the sync request when it is fast enough (3.5 seconds); otherwise the phone's
+provisional item stays and the cron retries. A prefix (`w `, `p `, `g `) always wins, and an
+item you fixed by hand is never overwritten.
+
+To tune the prompt (`worker/src/sort/prompt.ts`): run the **Eval sorting** workflow from the
+Actions tab. It runs `evals/cases.ts` against the real API and lists mismatches in the run
+summary.
+
 ## Setup
 
 One-time, browser only: [docs/SETUP.md](docs/SETUP.md).
@@ -63,7 +78,9 @@ The app stores the token on the device and removes it from the address bar.
 
 - Type and press enter. `w `, `p ` or `g ` at the start files it under Work, Personal or
   Groceries; without a prefix it goes to Personal.
-- "in 10 min", "over een kwartier", "in an hour", "over 2 uur" set a reminder time.
+- "in 10 min", "over een kwartier", "in an hour", "over 2 uur" set a reminder time at once;
+  "morgen om 9", "vanavond", "voor vrijdag" and the like are understood a second later.
+- Several things in one line ("melk, brood en bel de tandarts") become separate items.
 - Tap the toast to fix the list, time or title; Undo removes the capture.
 - Share text or a link from any Android app to Unforget to capture it.
 - The dot in the top right shows sync status; tap it for Sync now, notifications and Export.
@@ -86,7 +103,7 @@ allowed browser origins: `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`.
 | -------------------- | ----------------------------------------------------------- |
 | GitHub Pages         | €0                                                          |
 | Cloudflare Worker+D1 | €0 (free plan: 100,000 requests/day; the app uses a tiny fraction) |
-| Claude Haiku (M3)    | Expected well under €1/month, capped at 300 calls/day       |
+| Claude Haiku         | About $0.0003 per capture; capped at 300 calls/day (≈ $0.10) |
 
 ## Development
 
