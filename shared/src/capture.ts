@@ -1,4 +1,5 @@
 import { parseCapture } from './parse';
+import { capitalizeFirst } from './text';
 import type { Settings } from './settings';
 import type { Capture, CaptureSource, Item } from './types';
 
@@ -28,7 +29,7 @@ export function createCapture(
     id: newId(),
     captureId: capture.id,
     list: parsed.list ?? 'personal',
-    title: parsed.title,
+    title: capitalizeFirst(parsed.title),
     remindAt: parsed.remindAt,
     dueAt: null,
     notifiedAt: null,

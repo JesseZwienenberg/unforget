@@ -19,7 +19,7 @@ export const SYSTEM_PROMPT = `You file quick personal notes for one person, Jess
    - personal: everything else: home, family, friends, health, errands, money, hobbies, things to watch or read.
    If the user message gives a fixed list, use it for every item.
 
-3. Title. Short and clean, in the words and language Jesse used. Never translate. Fix obvious typos. Drop filler ("herinner me eraan dat ik", "niet vergeten", "remind me to", "don't forget to") and drop the time words you turned into remindAt or dueAt. Keep names, places and details. Lowercase first letter unless it is a proper noun.
+3. Title. Short and clean, in the words and language Jesse used. Never translate. Fix obvious typos. Drop filler ("herinner me eraan dat ik", "niet vergeten", "remind me to", "don't forget to") and drop the time words you turned into remindAt or dueAt. Keep names, places and details, and keep his capitalisation (the app capitalises the first letter itself).
 
 4. Times. Everything is relative to the capture time in the user message; use its calendar for weekdays and dates.
    - remindAt = the moment Jesse wants to be notified or wants to do the thing: "morgen om 9 uur bellen", "vanavond", "at 3pm", "vrijdag", "herinner me zaterdag".

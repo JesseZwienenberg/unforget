@@ -30,13 +30,13 @@ describe('todayView', () => {
   const view = todayView(items, NOW, TZ);
 
   it('shows reminders and deadlines for today, soonest first', () => {
-    expect(titles(view.today)).toEqual(['earlier today', 'later today', 'due today']);
+    expect(titles(view.today)).toEqual(['Earlier today', 'Later today', 'Due today']);
   });
   it('shows open items from earlier days as overdue, oldest first', () => {
-    expect(titles(view.overdue)).toEqual(['was due', 'yesterday']);
+    expect(titles(view.overdue)).toEqual(['Was due', 'Yesterday']);
   });
   it('uses the local date, not the UTC date', () => {
-    expect(titles(view.today)).not.toContain('just after midnight');
+    expect(titles(view.today)).not.toContain('Just after midnight');
   });
 });
 
@@ -61,7 +61,7 @@ describe('listItems', () => {
       item('p elsewhere'),
       item('w deleted', { deletedAt: NOW.toISOString() }),
     ];
-    expect(titles(listItems(items, 'work'))).toEqual(['reminder', 'deadline', 'new', 'old']);
+    expect(titles(listItems(items, 'work'))).toEqual(['Reminder', 'Deadline', 'New', 'Old']);
   });
 });
 
@@ -72,7 +72,7 @@ describe('groceryView', () => {
   it('groups by section in the configured order, unknown sections under Other', () => {
     const view = groceryView([g('soap', 'Household'), g('milk', 'Dairy & eggs'), g('apples', 'Fruit & vegetables'), g('thing', null), g('odd', 'Nonexistent')], DEFAULT_SETTINGS);
     expect(view.sections.map((s) => s.name)).toEqual(['Fruit & vegetables', 'Dairy & eggs', 'Household', 'Other']);
-    expect(titles(view.sections[3]!.items)).toEqual(['thing', 'odd']);
+    expect(titles(view.sections[3]!.items)).toEqual(['Thing', 'Odd']);
   });
 
   it('lists ticked items under Recent, latest first, once each, unless back on the list', () => {
@@ -86,7 +86,7 @@ describe('groceryView', () => {
       ],
       DEFAULT_SETTINGS,
     );
-    expect(titles(view.recent)).toEqual(['bread', 'milk']);
+    expect(titles(view.recent)).toEqual(['Bread', 'Milk']);
   });
 
   it('labels quantities', () => {

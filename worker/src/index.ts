@@ -8,6 +8,7 @@ import { loadSettings } from './settings';
 import { sortCapture, sortPending, type SortDeps } from './sort/apply';
 import { createSorter } from './sort/llm';
 import { sync } from './sync';
+import { usageReport } from './usage';
 import { testPayload } from '../../shared/src/notify';
 import { parseSyncRequest } from '../../shared/src/validate';
 
@@ -158,6 +159,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext | undefin
 
   if (pathname === '/v1/ping' && method === 'GET') return json({ ok: true });
   if (pathname === '/v1/sync' && method === 'POST') return handleSync(request, env, ctx);
+
+  if (pathname === '/v1/usage' && method === 'GET') return json(await usageReport(env.DB, await loadSettings(env.DB), new Date()));
 
   if (pathname === '/v1/push/key' && method === 'GET') {
     return env.VAPID_PUBLIC_KEY ? json({ publicKey: env.VAPID_PUBLIC_KEY }) : json({ error: 'push_not_configured' }, 503);

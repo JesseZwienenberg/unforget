@@ -14,6 +14,7 @@
 What exists for M3:
 - Worker: `worker/src/sort/` (prompt + forced tool for `claude-haiku-5-5`, output validation, claim → call → settle → apply, grocery merge, retries with backoff, daily cap), migration `0004_sorting.sql`, sorting inside the sync request (3.5 s limit) and in the cron.
 - App: toast refreshes when the sorted result arrives; "Sort captures automatically" switch in the More sheet.
+- Follow-up from Jesse's first feedback (27 Nov): captures wait up to 5 s for the sorter instead of jumping from Personal; titles start with a capital; Spending section in the More sheet (`GET /v1/usage`, migration `0005_usage.sql`).
 - Evals: `evals/cases.ts` (36 cases), `evals/sorting.eval.ts`, workflow "Eval sorting" (manual).
 - Tests: unit tests on real SQLite for sorting, merging, retries, cap; Chrome e2e with a stand-in model.
 

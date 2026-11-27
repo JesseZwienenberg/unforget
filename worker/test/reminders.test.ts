@@ -60,7 +60,7 @@ describe('reminder selection', () => {
     const report = await run(10);
     expect(report).toMatchObject({ due: 1, sent: 1, late: 0 });
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.payload).toMatchObject({ kind: 'reminder', title: 'oven uit', itemId: item.id, body: '⏰ 14:10 · Personal' });
+    expect(sent[0]!.payload).toMatchObject({ kind: 'reminder', title: 'Oven uit', itemId: item.id, body: '⏰ 14:10 · Personal' });
     expect(sent[0]!.ttl).toBe(12 * 3600);
     expect(row(item.id).notified_at).toBe(iso(10));
   });
@@ -102,7 +102,7 @@ describe('reminder selection', () => {
     await add('p second', iso(8));
     await add('p first', iso(5));
     await run(10);
-    expect(sent.map((s) => s.payload.title)).toEqual(['first', 'second']);
+    expect(sent.map((s) => s.payload.title)).toEqual(['First', 'Second']);
   });
 });
 
@@ -271,7 +271,7 @@ describe('HTTP', () => {
 
   it('health says whether push is configured', async () => {
     const on = await worker.fetch(new Request('https://w.example/health'), env());
-    expect(await on.json()).toMatchObject({ pushConfigured: true, schema: 'm3' });
+    expect(await on.json()).toMatchObject({ pushConfigured: true, schema: 'm3b' });
     const off = await worker.fetch(new Request('https://w.example/health'), env({ VAPID_PRIVATE_KEY: undefined }));
     expect(await off.json()).toMatchObject({ pushConfigured: false });
   });

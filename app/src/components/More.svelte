@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { formatWhen } from '$shared/time';
+  import { formatUsd } from '$shared/cost';
+  import { formatDay, formatWhen, localDate } from '$shared/time';
   import { app } from '../lib/app.svelte';
+
+  // The sheet only exists while it is open, so this loads fresh numbers each time.
+  void app.loadUsage();
+  const calls = (n: number) => `${n} ${n === 1 ? 'capture' : 'captures'}`;
+  const todayDate = $derived(localDate(app.now, app.timeZone));
 
   const status = $derived.by(() => {
     switch (app.syncState) {
@@ -77,6 +83,41 @@
   </section>
 
   <section>
+    <h3>Spending</h3>
+    {#if app.usage}
+      <table>
+        <tbody>
+          <tr><th scope="row">Today</th><td>{formatUsd(app.usage.today.costUsd)}</td><td>{calls(app.usage.today.calls)} of {app.usage.dailyCap} allowed</td></tr>
+          <tr><th scope="row">This month</th><td>{formatUsd(app.usage.month.costUsd)}</td><td>{calls(app.usage.month.calls)}</td></tr>
+          <tr><th scope="row">All time</th><td>{formatUsd(app.usage.allTime.costUsd)}</td><td>{calls(app.usage.allTime.calls)}</td></tr>
+        </tbody>
+      </table>
+      {#if app.usage.days.length > 1}
+        <details>
+          <summary>Per day</summary>
+          <table>
+            <tbody>
+              {#each app.usage.days as day (day.day)}
+                <tr><th scope="row">{formatDay(day.day, todayDate)}</th><td>{formatUsd(day.costUsd)}</td><td>{calls(day.calls)}</td></tr>
+              {/each}
+            </tbody>
+          </table>
+        </details>
+      {/if}
+      <p class="muted">
+        Sorting by Claude Haiku is the only thing that costs money; hosting is free. Amounts are in US dollars, worked out from the tokens each
+        capture used. Your Anthropic Console shows the actual bill and remaining credit.
+      </p>
+    {:else if app.usageNote}
+      <p class="muted">{app.usageNote}</p>
+    {:else if app.syncState === 'unconfigured'}
+      <p class="muted">Shown once this device is connected.</p>
+    {:else}
+      <p class="muted">Loading…</p>
+    {/if}
+  </section>
+
+  <section>
     <h3>Your data</h3>
     <p class="muted">Downloads every capture and item on this device, including done and deleted ones.</p>
     <button type="button" onclick={() => app.exportEverything()}>Export everything (JSON)</button>
@@ -108,6 +149,36 @@
   .muted {
     color: var(--muted);
     font-size: 0.9rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0.6rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th,
+  td {
+    text-align: left;
+    font-weight: 400;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  td:nth-child(2) {
+    font-weight: 600;
+    padding: 0.3rem 0.75rem;
+    white-space: nowrap;
+  }
+  td:last-child {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  details {
+    margin-bottom: 0.6rem;
+  }
+  summary {
+    padding: 0.7rem 0;
+    color: var(--muted);
+    cursor: pointer;
   }
   .toggle {
     display: flex;

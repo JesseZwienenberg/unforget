@@ -25,7 +25,7 @@
       <span class="meta">
         {#if item.remindAt}<span class:late={remindLate}>⏰ {formatWhen(item.remindAt, app.timeZone, app.now)}</span>{/if}
         {#if due}<span class:late={dueLate}>due {formatDay(due, today)}</span>{/if}
-        {#if showList}<span>{LIST_NAMES[item.list]}</span>{/if}
+        {#if showList}<span>{app.sorting.has(item.id) ? 'sorting…' : LIST_NAMES[item.list]}</span>{/if}
         {#if item.unsorted}<span>unsorted</span>{/if}
       </span>
     {/if}

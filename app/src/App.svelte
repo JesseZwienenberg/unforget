@@ -18,10 +18,13 @@
     { id: 'groceries', name: LIST_NAMES.groceries },
   ];
 
+  // Captures still being sorted stay out of the list tabs, so nothing jumps between lists.
+  // Today always shows everything: a reminder must be visible at once.
+  const settled = $derived(app.sorting.size ? app.items.filter((i) => !app.sorting.has(i.id)) : app.items);
   const today = $derived(todayView(app.items, app.now, app.timeZone));
   const todayCount = $derived(today.overdue.length + today.today.length);
-  const groceries = $derived(groceryView(app.items, app.settings));
-  const list = $derived(app.tab === 'work' || app.tab === 'personal' ? listItems(app.items, app.tab) : []);
+  const groceries = $derived(groceryView(settled, app.settings));
+  const list = $derived(app.tab === 'work' || app.tab === 'personal' ? listItems(settled, app.tab) : []);
 
   // A tap on empty space opens the keyboard: Android will not open it by itself on a cold start.
   function focusOnEmptyTap(event: MouseEvent) {
@@ -113,7 +116,7 @@
             <button type="button" class="toast-text" onclick={() => app.toast?.itemId && app.edit(app.toast.itemId)}>
               {app.toast.text}
               {#if app.toast.warning}<strong>⚠ {app.toast.warning}</strong>{/if}
-              <small>Tap to fix</small>
+              <small>{app.toast.hint ?? 'Tap to fix'}</small>
             </button>
           {:else}
             <span class="toast-text">

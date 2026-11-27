@@ -105,6 +105,10 @@ allowed browser origins: `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`.
 | Cloudflare Worker+D1 | €0 (free plan: 100,000 requests/day; the app uses a tiny fraction) |
 | Claude Haiku         | About $0.0003 per capture; capped at 300 calls/day (≈ $0.10) |
 
+The app shows the running total: tap the dot in the top right → **Spending** (today, this
+month, all time). It is calculated from the tokens each capture used, at the prices in
+`shared/src/cost.ts`; the Anthropic Console shows the real bill and the remaining credit.
+
 ## Development
 
 Requires Node 22 and Chrome. `npm ci`, then `npm run check` runs everything CI runs:

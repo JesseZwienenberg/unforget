@@ -56,7 +56,8 @@ const model = createServer((req, res) => {
     const item = (title, extra) => ({ title, list: 'personal', remindAt: null, dueAt: null, grocery: null, confidence: 0.95, ...extra });
     const grocery = (name, canonicalName, section) => item(name, { list: 'groceries', grocery: { canonicalName, displayName: name, quantity: null, section } });
     const items = [grocery('melk', 'milk', 'Dairy & eggs'), grocery('brood', 'bread', 'Bread & bakery'), item('tandarts bellen', { remindAt: '2030-01-07T07:45:00+01:00' })];
-    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ content: [{ type: 'tool_use', id: 't1', name: 'file_items', input: { items } }] }));
+    const usage = { input_tokens: 2000, output_tokens: 100, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ content: [{ type: 'tool_use', id: 't1', name: 'file_items', input: { items } }], usage }));
   });
 }).listen(8788);
 
@@ -108,7 +109,7 @@ try {
   await phone.context.setOffline(true);
   await phone.page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await phone.capture('over 10 minuten oven uit');
-  await phone.page.getByText(/^Saved → Personal · ⏰ \d\d:\d\d · oven uit/).waitFor({ timeout: 5000 });
+  await phone.page.getByText(/^Saved → Personal · ⏰ \d\d:\d\d · Oven uit/).waitFor({ timeout: 5000 });
   await phone.page.locator('.toast').getByText('not scheduled yet: offline').waitFor({ timeout: 5000 });
   if ((await phone.box.inputValue()) !== '') throw new Error('box was not cleared');
   if (!(await phone.box.evaluate((el) => el === document.activeElement))) throw new Error('box lost focus after saving');
@@ -116,16 +117,16 @@ try {
   await phone.page.getByText('Saved → Groceries · Ketchup').waitFor({ timeout: 5000 });
   await phone.capture('w kwartaalcijfers nakijken');
   await phone.status.getByText('Offline · 6 waiting').waitFor({ timeout: 5000 });
-  await see(phone.page, 'oven uit'); // has a reminder today, so it is on Today
+  await see(phone.page, 'Oven uit'); // has a reminder today, so it is on Today
   await phone.page.locator('li').getByText('not scheduled yet: offline').waitFor({ timeout: 5000 });
 
   step('phone: still there after closing and reopening offline');
   await phone.page.reload();
-  await see(phone.page, 'oven uit');
+  await see(phone.page, 'Oven uit');
   await phone.tab('Groceries');
   await see(phone.page, 'Ketchup');
   await phone.tab('Work');
-  await see(phone.page, 'kwartaalcijfers nakijken');
+  await see(phone.page, 'Kwartaalcijfers nakijken');
 
   step('phone: back online, everything syncs');
   await phone.context.setOffline(false);
@@ -137,7 +138,7 @@ try {
   const laptop = await device('laptop');
   await laptop.page.goto(SETUP);
   await laptop.synced();
-  await see(laptop.page, 'oven uit');
+  await see(laptop.page, 'Oven uit');
   await laptop.tab('Groceries');
   await see(laptop.page, 'Ketchup');
 
@@ -158,7 +159,7 @@ try {
   await phone.capture('p vergissing');
   await phone.page.getByRole('button', { name: 'Undo' }).click();
   await phone.tab('Personal');
-  await gone(phone.page, 'vergissing');
+  await gone(phone.page, 'Vergissing');
 
   step('phone: tap the toast to fix the list and the title');
   await phone.capture('w taart bestellen');
@@ -169,7 +170,7 @@ try {
   await dialog.getByLabel('Deadline').fill('2026-12-05');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await phone.tab('Personal');
-  await see(phone.page, 'taart bestellen voor zaterdag');
+  await see(phone.page, 'Taart bestellen voor zaterdag');
   await phone.page.getByText(/^due /).first().waitFor({ timeout: 5000 });
   await phone.synced();
 
@@ -177,19 +178,19 @@ try {
   await laptop.page.reload();
   await laptop.synced();
   await laptop.tab('Personal');
-  await see(laptop.page, 'taart bestellen voor zaterdag');
+  await see(laptop.page, 'Taart bestellen voor zaterdag');
   if (await laptop.page.getByText('vergissing').count()) throw new Error('undone capture reached the laptop');
 
   step('notification tap: opens the snooze sheet for that item');
   const server = (body) =>
     fetch(`${API}/v1/sync`, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}` }, body: JSON.stringify(body) }).then((r) => r.json());
-  const oven = (await server({ since: 0 })).items.find((i) => i.title === 'oven uit');
+  const oven = (await server({ since: 0 })).items.find((i) => i.title === 'Oven uit');
   await phone.page.goto(`${APP}?item=${oven.id}`);
   const sheet = phone.page.getByRole('dialog', { name: 'Snooze' });
-  await sheet.getByText('oven uit').waitFor({ timeout: 10000 });
+  await sheet.getByText('Oven uit').waitFor({ timeout: 10000 });
   if (phone.page.url() !== APP) throw new Error(`item parameter still in URL: ${phone.page.url()}`);
   await sheet.getByRole('button', { name: /Tomorrow morning/ }).click();
-  await phone.page.getByText(/^Snoozed → ⏰ tomorrow 07:45 · oven uit/).waitFor({ timeout: 5000 });
+  await phone.page.getByText(/^Snoozed → ⏰ tomorrow 07:45 · Oven uit/).waitFor({ timeout: 5000 });
   await phone.synced();
   const snoozed = (await server({ since: 0 })).items.find((i) => i.id === oven.id);
   if (!/T0[56]:45:00\.000Z$/.test(snoozed.remindAt)) throw new Error(`snooze did not reach the server: ${snoozed.remindAt}`);
@@ -200,18 +201,20 @@ try {
   await phone.page.reload();
   await phone.synced();
   await phone.tab('Personal');
-  await gone(phone.page, 'oven uit');
+  await gone(phone.page, 'Oven uit');
 
   step('smart sorting: one capture becomes three sorted items, and the toast follows');
   await phone.tab('Today');
   await phone.capture('sorteer melk, brood en maandag tandarts bellen');
-  await phone.page.getByText('Saved → 3 items · melk · brood · tandarts bellen').waitFor({ timeout: 10000 });
+  // While the model works, the toast names no list and the item is not in any list tab yet.
+  await phone.page.getByText('Sorting… · Tap to fix').waitFor({ timeout: 5000 });
+  await phone.page.getByText('Saved → 3 items · Melk · Brood · Tandarts bellen').waitFor({ timeout: 10000 });
   await phone.tab('Groceries');
   await phone.page.getByRole('heading', { name: 'Dairy & eggs' }).waitFor({ timeout: 5000 });
   await phone.page.getByRole('heading', { name: 'Bread & bakery' }).waitFor({ timeout: 5000 });
-  await phone.page.getByLabel('Mark done: melk').waitFor({ timeout: 5000 });
+  await phone.page.getByLabel('Mark done: Melk').waitFor({ timeout: 5000 });
   await phone.tab('Personal');
-  await see(phone.page, 'tandarts bellen');
+  await see(phone.page, 'Tandarts bellen');
   await phone.page.getByText('⏰ Mon 7 Jan 2030 07:45').waitFor({ timeout: 5000 });
   const sortCall = modelCalls.find((c) => c.capture.startsWith('sorteer'));
   if (sortCall?.key !== 'e2e-key' || sortCall?.model !== 'claude-haiku-5-5') throw new Error(`unexpected model call: ${JSON.stringify(sortCall)}`);
@@ -220,8 +223,23 @@ try {
   await phone.capture('sorteer melk, brood en maandag tandarts bellen');
   await phone.synced();
   await phone.tab('Groceries');
-  await phone.page.getByLabel('Mark done: melk × 2').waitFor({ timeout: 10000 });
-  if ((await phone.page.getByLabel(/^Mark done: melk/).count()) !== 1) throw new Error('duplicate grocery line');
+  await phone.page.getByLabel('Mark done: Melk × 2').waitFor({ timeout: 10000 });
+  if ((await phone.page.getByLabel(/^Mark done: Melk/).count()) !== 1) throw new Error('duplicate grocery line');
+
+  step('no jump: when the model does not answer, the item waits a few seconds, then shows under Personal');
+  await phone.tab('Personal');
+  await phone.capture('fiets naar de maker');
+  await phone.page.getByText('Saved · Fiets naar de maker').waitFor({ timeout: 5000 });
+  if (await phone.page.locator('li', { hasText: 'Fiets naar de maker' }).count()) throw new Error('item was listed while still being sorted');
+  await phone.page.locator('li', { hasText: 'Fiets naar de maker' }).waitFor({ timeout: 10000 });
+
+  step('spending: the app shows what sorting has cost');
+  await phone.status.click();
+  const spending = phone.page.locator('section', { hasText: 'Spending' });
+  await spending.getByRole('row', { name: /All time \$0\.00\d\d \d+ captures/ }).waitFor({ timeout: 10000 });
+  await spending.getByRole('row', { name: /Today .* of 300 allowed/ }).waitFor({ timeout: 5000 });
+  await phone.page.keyboard.press('Escape');
+  await phone.page.getByRole('dialog', { name: 'Unforget' }).waitFor({ state: 'hidden' });
 
   step('smart sorting: switched off, the model is not called');
   await phone.status.click();
@@ -242,7 +260,7 @@ try {
 
   step('share target: shared text is saved as a capture');
   await phone.page.goto(`${APP}?share_title=Recept&share_text=${encodeURIComponent('Recept https://example.com/pasta')}`);
-  await phone.page.getByText('Saved → Personal · Recept https://example.com/pasta').waitFor({ timeout: 5000 });
+  await phone.page.getByText('Saved → Personal · Recept https://example.com/pasta').waitFor({ timeout: 12000 });
   if (phone.page.url() !== APP) throw new Error(`share parameters still in URL: ${phone.page.url()}`);
   await phone.page.reload();
   await phone.tab('Personal');
@@ -252,7 +270,7 @@ try {
   await phone.status.click();
   const [download] = await Promise.all([phone.page.waitForEvent('download'), phone.page.getByRole('button', { name: 'Export everything (JSON)' }).click()]);
   const data = JSON.parse(readFileSync(await download.path(), 'utf8'));
-  if (data.captures.length !== 9) throw new Error(`export has ${data.captures.length} captures`);
+  if (data.captures.length !== 10) throw new Error(`export has ${data.captures.length} captures`);
   if (!data.captures.some((c) => c.text === 'p vergissing' && c.deletedAt)) throw new Error('export lost the undone capture');
   if (!data.captures.some((c) => c.text === 'G Ketchup')) throw new Error('raw capture text was changed');
 

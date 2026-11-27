@@ -52,7 +52,7 @@ async function run(c: EvalCase, sorter: ReturnType<typeof createSorter>): Promis
   const deviceRemindAt = parseCapture(c.text, capturedAt, S.prefixes).remindAt;
   const started = Date.now();
   try {
-    const raw = await sorter({ text: rest, capturedAt, settings: S, fixedList, deviceRemindAt }, 30_000);
+    const { output: raw } = await sorter({ text: rest, capturedAt, settings: S, fixedList, deviceRemindAt }, 30_000);
     const items = settle(parseSortOutput(raw, S), fixedList, deviceRemindAt, S);
     const problems = c.expect.flatMap((e, i) => compare(e, items[i], i + 1));
     if (items.length !== c.expect.length) problems.unshift(`expected ${c.expect.length} items, got ${items.length}: ${items.map((i) => i.title).join(' | ')}`);

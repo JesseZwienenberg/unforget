@@ -11,6 +11,7 @@ import type { Sorter } from '../src/sort/llm';
 import { extractToolInput, InvalidOutput, parseModelTime, parseSortOutput, type SortedItem } from '../src/sort/output';
 import { buildRequest, buildUserMessage, dutchClockHints, toLocalIso, type PromptInput } from '../src/sort/prompt';
 import { sync } from '../src/sync';
+import { usageReport } from '../src/usage';
 import { createTestD1, type TestD1 } from './d1';
 
 const S = DEFAULT_SETTINGS;
@@ -135,7 +136,7 @@ describe('settle', () => {
   it('a prefix overrides the model for every item', () => {
     const out = settle([base, { ...base, list: 'personal' }], 'groceries', null, S);
     expect(out.map((i) => i.list)).toEqual(['groceries', 'groceries']);
-    expect(out[0]!.grocery).toEqual({ canonicalName: 'x', displayName: 'x', quantity: null, section: 'Other' });
+    expect(out[0]!.grocery).toEqual({ canonicalName: 'x', displayName: 'X', quantity: null, section: 'Other' });
   });
 
   it('low confidence goes to Personal, marked unsorted', () => {
@@ -167,7 +168,7 @@ let answer: (input: PromptInput) => unknown;
 
 const sorter: Sorter = async (input) => {
   calls.push(input);
-  return answer(input);
+  return { output: answer(input), tokens: { inputTokens: 2000, outputTokens: 100, cacheWriteTokens: 0, cacheReadTokens: 0 } };
 };
 const deps = (minute = 4, settings = S): SortDeps => ({ db: db.d1, sorter, settings, now: at(minute) });
 const out = (...items: Partial<SortedItem>[]) => ({
@@ -200,7 +201,7 @@ describe('sortCapture', () => {
     expect(await sortCapture(deps(), capture.id, 1000)).toBe('sorted');
     const items = await live();
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ id: item.id, title: 'sorted', list: 'work', provisional: false, unsorted: false, captureId: capture.id });
+    expect(items[0]).toMatchObject({ id: item.id, title: 'Sorted', list: 'work', provisional: false, unsorted: false, captureId: capture.id });
     expect(captureRow(capture.id)).toMatchObject({ sort_status: 'sorted', text: 'kwartaalcijfers nakijken' });
     expect(calls[0]).toMatchObject({ text: 'kwartaalcijfers nakijken', fixedList: null, deviceRemindAt: null });
   });
@@ -210,13 +211,13 @@ describe('sortCapture', () => {
     answer = () => out(groc('milk', 'melk'), groc('bread', 'brood', null, 'Bread & bakery'), { title: 'bel de tandarts', remindAt: '2026-11-27T07:45:00+01:00' });
     await sortCapture(deps(), capture.id, 1000);
     const items = await live();
-    expect(items.map((i) => i.title).sort()).toEqual(['bel de tandarts', 'brood', 'melk']);
-    expect(items.find((i) => i.title === 'melk')!.id).toBe(item.id);
-    expect(items.find((i) => i.title === 'brood')!.id).toBe(await derivedId(capture.id, 1));
-    expect(items.find((i) => i.title === 'bel de tandarts')).toMatchObject({ id: await derivedId(capture.id, 2), remindAt: '2026-11-27T06:45:00.000Z', list: 'personal' });
+    expect(items.map((i) => i.title).sort()).toEqual(['Bel de tandarts', 'Brood', 'Melk']);
+    expect(items.find((i) => i.title === 'Melk')!.id).toBe(item.id);
+    expect(items.find((i) => i.title === 'Brood')!.id).toBe(await derivedId(capture.id, 1));
+    expect(items.find((i) => i.title === 'Bel de tandarts')).toMatchObject({ id: await derivedId(capture.id, 2), remindAt: '2026-11-27T06:45:00.000Z', list: 'personal' });
     const inOrder = [...items].sort((x, y) => x.createdAt.localeCompare(y.createdAt)).map((i) => i.title);
-    expect(inOrder).toEqual(['melk', 'brood', 'bel de tandarts']);
-    expect(items.find((i) => i.title === 'brood')!.grocery).toEqual({ canonicalName: 'bread', displayName: 'brood', quantity: null, section: 'Bread & bakery' });
+    expect(inOrder).toEqual(['Melk', 'Brood', 'Bel de tandarts']);
+    expect(items.find((i) => i.title === 'Brood')!.grocery).toEqual({ canonicalName: 'bread', displayName: 'Brood', quantity: null, section: 'Bread & bakery' });
   });
 
   it('sends the text without its prefix and forces the list', async () => {
@@ -224,7 +225,7 @@ describe('sortCapture', () => {
     answer = () => out({ title: 'taart regelen voor Anna', list: 'personal' });
     await sortCapture(deps(), capture.id, 1000);
     expect(calls[0]).toMatchObject({ text: 'taart regelen voor Anna', fixedList: 'work' });
-    expect((await live())[0]).toMatchObject({ list: 'work', title: 'taart regelen voor Anna' });
+    expect((await live())[0]).toMatchObject({ list: 'work', title: 'Taart regelen voor Anna' });
   });
 
   it('keeps the reminder the phone computed, and does not re-send it if it already fired', async () => {
@@ -233,7 +234,7 @@ describe('sortCapture', () => {
     answer = () => out({ title: 'oven uit', remindAt: '2026-11-26T14:14:00+01:00' });
     await sortCapture(deps(20), capture.id, 1000);
     expect(calls[0]!.deviceRemindAt).toBe(item.remindAt);
-    expect((await live())[0]).toMatchObject({ title: 'oven uit', remindAt: item.remindAt, notifiedAt: at(13).toISOString() });
+    expect((await live())[0]).toMatchObject({ title: 'Oven uit', remindAt: item.remindAt, notifiedAt: at(13).toISOString() });
   });
 
   it('puts a guess under Personal, marked unsorted', async () => {
@@ -264,7 +265,7 @@ describe('grocery de-duplication', () => {
 
     const items = await live();
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ id: first.item.id, title: 'melk', grocery: { canonicalName: 'milk', displayName: 'melk', quantity: 2 } });
+    expect(items[0]).toMatchObject({ id: first.item.id, title: 'Melk', grocery: { canonicalName: 'milk', displayName: 'Melk', quantity: 2 } });
     expect((await allItems()).find((i) => i.id === second.item.id)!.deletedAt).not.toBeNull();
     expect(captureRow(second.capture.id)).toMatchObject({ sort_status: 'sorted', text: 'milk' });
   });
@@ -287,8 +288,8 @@ describe('grocery de-duplication', () => {
     answer = () => out(groc('bread', 'brood', null, 'Bread & bakery'), groc('milk', 'melk'));
     await sortCapture(deps(6), second.capture.id, 1000);
     const items = await live();
-    expect(items.map((i) => `${i.title}:${i.grocery!.quantity}`).sort()).toEqual(['brood:null', 'melk:2']);
-    expect(items.find((i) => i.title === 'brood')!.id).toBe(second.item.id);
+    expect(items.map((i) => `${i.title}:${i.grocery!.quantity}`).sort()).toEqual(['Brood:null', 'Melk:2']);
+    expect(items.find((i) => i.title === 'Brood')!.id).toBe(second.item.id);
   });
 
   it('merges a product named twice in one capture', async () => {
@@ -353,7 +354,7 @@ describe('failures, retries and the daily cap', () => {
 
     answer = () => out({ title: 'thee' });
     expect(await sortCapture(deps(7), capture.id, 1000)).toBe('sorted');
-    expect((await live())[0]).toMatchObject({ title: 'thee', provisional: false });
+    expect((await live())[0]).toMatchObject({ title: 'Thee', provisional: false });
   });
 
   it('treats invalid model output as a failure', async () => {
@@ -417,11 +418,54 @@ describe('failures, retries and the daily cap', () => {
   });
 });
 
+describe('spending', () => {
+  it('records the tokens of every call, per local day, and reports the cost', async () => {
+    await captureText('a', 1);
+    await captureText('b', 2);
+    await sortPending(deps(4), 10, 1000);
+    const late = await captureText('c', 3);
+    // 23:30 UTC on the 26th is already the 27th in Amsterdam.
+    await sortCapture({ ...deps(), now: new Date('2026-11-26T23:30:00.000Z') }, late.capture.id, 1000);
+
+    const report = await usageReport(db.d1, S, new Date('2026-11-27T09:00:00.000Z'));
+    expect(report.today).toMatchObject({ calls: 1, inputTokens: 2000, outputTokens: 100 });
+    expect(report.month).toMatchObject({ calls: 3, inputTokens: 6000, outputTokens: 300 });
+    expect(report.allTime.costUsd).toBeCloseTo((6000 * 0.1 + 300 * 0.5) / 1_000_000);
+    expect(report.days.map((d) => [d.day, d.calls])).toEqual([
+      ['2026-11-27', 1],
+      ['2026-11-26', 2],
+    ]);
+    expect(report.dailyCap).toBe(300);
+    expect(report.since).toBe('2026-11-26');
+  });
+
+  it('counts tokens even when the answer was unusable', async () => {
+    const { capture } = await captureText('iets');
+    answer = () => ({ items: 'nonsense' });
+    expect(await sortCapture(deps(), capture.id, 1000)).toBe('failed');
+    expect((await usageReport(db.d1, S, at(5))).today).toMatchObject({ calls: 1, inputTokens: 2000, outputTokens: 100 });
+  });
+
+  it('is empty before the first call', async () => {
+    const report = await usageReport(db.d1, S, at(5));
+    expect(report.allTime).toMatchObject({ calls: 0, costUsd: 0 });
+    expect(report.days).toEqual([]);
+    expect(report.since).toBeNull();
+  });
+});
+
 describe('sorting inside the sync request', () => {
   const env = (extra: Partial<Env> = {}): Env => ({ DB: db.d1, ALLOWED_ORIGINS: 'https://jessezwienenberg.github.io', APP_TOKEN: 'tok', ANTHROPIC_API_KEY: 'sk-test', ...extra });
   const post = (body: unknown, e = env()) =>
     worker.fetch(new Request('https://w.example/v1/sync', { method: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) }), e);
-  const anthropic = (input: unknown) => new Response(JSON.stringify({ content: [{ type: 'tool_use', id: 't', name: 'file_items', input }] }), { status: 200 });
+  const anthropic = (input: unknown) =>
+    new Response(
+      JSON.stringify({
+        content: [{ type: 'tool_use', id: 't', name: 'file_items', input }],
+        usage: { input_tokens: 310, output_tokens: 95, cache_creation_input_tokens: 0, cache_read_input_tokens: 2400 },
+      }),
+      { status: 200 },
+    );
 
   afterEach(() => vi.unstubAllGlobals());
 
@@ -435,7 +479,7 @@ describe('sorting inside the sync request', () => {
     const res = await post({ since: 0, captures: [made.capture], items: [made.item] });
     const body = (await res.json()) as SyncResponse;
     expect(body.items).toHaveLength(1);
-    expect(body.items[0]).toMatchObject({ id: made.item.id, list: 'groceries', provisional: false, grocery: { canonicalName: 'ketchup', section: 'Pantry' } });
+    expect(body.items[0]).toMatchObject({ id: made.item.id, title: 'Ketchup', list: 'groceries', provisional: false, grocery: { canonicalName: 'ketchup', section: 'Pantry' } });
     expect(body.captures[0]).toMatchObject({ sortStatus: 'sorted', text: 'ketchup' });
 
     expect(seen).toHaveLength(1);
@@ -443,6 +487,13 @@ describe('sorting inside the sync request', () => {
     expect(seen[0]!.headers['x-api-key']).toBe('sk-test');
     expect(seen[0]!.headers['anthropic-version']).toBe('2023-06-01');
     expect(seen[0]!.body.model).toBe('claude-haiku-5-5');
+
+    // The API's own token counts end up in the spending overview.
+    const usage = await worker.fetch(new Request('https://w.example/v1/usage', { headers: { authorization: 'Bearer tok' } }), env());
+    const report = (await usage.json()) as { allTime: { calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; costUsd: number } };
+    expect(report.allTime).toMatchObject({ calls: 1, inputTokens: 310, outputTokens: 95, cacheReadTokens: 2400 });
+    expect(report.allTime.costUsd).toBeCloseTo((310 * 0.1 + 95 * 0.5 + 2400 * 0.01) / 1_000_000);
+    expect((await worker.fetch(new Request('https://w.example/v1/usage'), env())).status).toBe(401);
   });
 
   it('answers with the provisional item when the model fails, and never loses the capture', async () => {

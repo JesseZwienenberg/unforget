@@ -114,6 +114,12 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 - `ANTHROPIC_BASE_URL` exists only so the end-to-end test can point the Worker at a stand-in model.
 - Cost: about 2,500 input and 150 output tokens per capture at $0.10 / $0.50 per million tokens is roughly $0.0003 per capture; the 300-per-day cap bounds it at about 10 cents a day.
 
+## M3 follow-up (Jesse's feedback, 27 Nov)
+
+- No visible jump between lists: an unprefixed capture made while online with sorting on is kept out of the list tabs for up to 5 seconds while the model answers; the toast reads "Saved · …" with "Sorting…" and then names the real list. If no answer comes in time it appears under Personal as before. Today always shows it at once, so a reminder is never hidden. Offline, with a prefix, or with sorting off, nothing waits.
+- Every item's title starts with a capital: applied by code on the device (`createCapture`), after the model (`settle`, also the grocery display name) and when saving an edit. Links are left alone. The raw capture text is never changed. Existing items were not rewritten.
+- Spending is tracked on the server: each model call's token counts (from the API's `usage`) are added to `llm_usage` per local day, including calls whose answer was unusable. `GET /v1/usage` returns today, this month, all time and per day; the More sheet shows it. Cost = tokens × list prices in `shared/src/cost.ts` (US dollars); the Anthropic Console remains the authoritative bill. Eval-workflow calls are not counted: they run in GitHub Actions, not through the Worker.
+
 ## Later
 
 Nothing yet.

@@ -43,7 +43,7 @@ describe('sync', () => {
     await push({ captures: [b.capture], items: [b.item] });
 
     const delta = await push({ since: r1.cursor });
-    expect(delta.items.map((i) => i.title)).toEqual(['two']);
+    expect(delta.items.map((i) => i.title)).toEqual(['Two']);
     expect(delta.captures.map((c) => c.id)).toEqual([b.capture.id]);
 
     const nothing = await push({ since: delta.cursor });
@@ -194,7 +194,7 @@ describe('POST /v1/sync', () => {
     const res = await post(JSON.stringify({ since: 0, captures: [a.capture], items: [a.item] }));
     expect(res.status).toBe(200);
     const body = (await res.json()) as SyncResponse;
-    expect(body.items[0]).toMatchObject({ list: 'work', title: 'demo' });
+    expect(body.items[0]).toMatchObject({ list: 'work', title: 'Demo' });
   });
 
   it('rejects bad input with 400 and stores nothing', async () => {
@@ -207,6 +207,6 @@ describe('POST /v1/sync', () => {
 
   it('health reports the current schema', async () => {
     const res = await worker.fetch(new Request('https://w.example/health'), env());
-    expect(await res.json()).toMatchObject({ ok: true, schema: 'm3' });
+    expect(await res.json()).toMatchObject({ ok: true, schema: 'm3b' });
   });
 });

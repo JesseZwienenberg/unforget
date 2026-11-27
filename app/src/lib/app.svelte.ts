@@ -1,5 +1,8 @@
 // The app's state and every action the screens can take. Screens stay dumb.
 import { createCapture } from '$shared/capture';
+import type { UsageReport } from '$shared/cost';
+import { splitPrefix } from '$shared/parse';
+import { capitalizeFirst } from '$shared/text';
 import { DEFAULT_SETTINGS, type Settings } from '$shared/settings';
 import { resolveSnooze } from '$shared/snooze';
 import { formatWhen } from '$shared/time';
@@ -20,6 +23,8 @@ export interface Toast {
   text: string;
   /** A second line that must not be missed, e.g. "not scheduled yet: offline". */
   warning?: string | null;
+  /** Small print under the text. Defaults to "Tap to fix" when the toast opens an item. */
+  hint?: string;
   /** Tapping the toast opens this item for a quick fix. */
   itemId: string | null;
   /** The capture this toast is about, so it can be refreshed when the sorter answers. */
@@ -28,6 +33,8 @@ export interface Toast {
 }
 
 const TOAST_MS = 6000;
+/** How long a fresh capture waits for the sorter before it is shown under its provisional list. */
+const SORT_WAIT_MS = 5000;
 const SYNC_EVERY_MS = 60_000;
 const newId = (): string => crypto.randomUUID();
 
@@ -50,6 +57,14 @@ class App {
   shell = $state<ShellStatus>('installing');
   updateReady = $state(false);
   apiHost = $state<string | null>(null);
+
+  /**
+   * Fresh captures the sorter is working on. They are kept out of the list tabs for
+   * a few seconds, so an item appears once, in the right place, instead of jumping.
+   */
+  sorting = $state.raw<ReadonlySet<string>>(new Set());
+  usage = $state.raw<UsageReport | null>(null);
+  usageNote = $state<string | null>(null);
 
   /** Items the server has not accepted yet: their reminders are not scheduled. */
   unsynced = $state.raw<ReadonlySet<string>>(new Set());
@@ -258,10 +273,18 @@ class App {
     if (!text.trim()) return;
     await this.start();
     const { capture, item } = createCapture(text, source, typedAt, this.settings, newId);
+    // Without a prefix the sorter decides the list. If it can answer right away, wait
+    // for it instead of showing the item under Personal first.
+    const awaitSort = splitPrefix(text, this.settings.prefixes).list === null && this.settings.llm.enabled && this.config !== null && navigator.onLine;
+    if (awaitSort) {
+      this.sorting = new Set([...this.sorting, item.id]);
+      setTimeout(() => this.stopWaiting(item.id), SORT_WAIT_MS);
+    }
     this.items = [...this.items, item];
     this.now = typedAt;
     this.showToast({
       text: this.savedText(item),
+      hint: awaitSort ? 'Sorting… · Tap to fix' : undefined,
       warning: item.remindAt ? this.offlineWarning() : null,
       itemId: item.id,
       captureId: capture.id,
@@ -269,6 +292,14 @@ class App {
     });
     await this.storage.saveCapture(capture, [item]);
     this.afterWrite();
+  }
+
+  /** The sorter answered, or took too long: the item may now show under its list. */
+  private stopWaiting(...ids: string[]): void {
+    const left = [...this.sorting].filter((id) => !ids.includes(id));
+    if (left.length === this.sorting.size) return;
+    this.sorting = new Set(left);
+    this.refreshToast();
   }
 
   /** The sorter answered while the toast is still up: show what the capture became. */
@@ -283,12 +314,13 @@ class App {
         ? this.savedText(first)
         : `Saved → ${items.length} items · ${[first, ...items.filter((i) => i !== first)].map((i) => i.title).join(' · ')}`;
     if (text === toast.text) return;
-    this.showToast({ ...toast, text, itemId: first?.id ?? null });
+    this.showToast({ ...toast, text, hint: undefined, itemId: first?.id ?? null });
   }
 
   private savedText(item: Item): string {
     const when = item.remindAt ? ` · ⏰ ${formatWhen(item.remindAt, this.timeZone, this.now)}` : '';
-    return `Saved → ${LIST_NAMES[item.list]}${when} · ${item.title}`;
+    // While the sorter is deciding, no list is named yet.
+    return this.sorting.has(item.id) ? `Saved${when} · ${item.title}` : `Saved → ${LIST_NAMES[item.list]}${when} · ${item.title}`;
   }
 
   private async undoCapture(captureId: string): Promise<void> {
@@ -333,7 +365,8 @@ class App {
 
   /** Saves a manual fix. A hand-edited item is no longer provisional: the sorter must not overwrite it. */
   async saveEdit(id: string, patch: Pick<Item, 'title' | 'list' | 'remindAt' | 'dueAt'>): Promise<void> {
-    await this.change(id, { ...patch, provisional: false, unsorted: false });
+    await this.change(id, { ...patch, title: capitalizeFirst(patch.title), provisional: false, unsorted: false });
+    this.stopWaiting(id);
     this.editingId = null;
   }
 
@@ -400,6 +433,8 @@ class App {
           const [items, settings] = await Promise.all([this.storage.loadItems(), this.storage.loadSettings()]);
           this.items = items;
           if (settings) this.settings = settings.value;
+          // Sorted items (no longer provisional, or merged away) stop waiting.
+          this.stopWaiting(...[...this.sorting].filter((id) => this.items.find((i) => i.id === id)?.provisional !== true));
           this.refreshToast();
           this.openWanted();
         }
@@ -418,6 +453,24 @@ class App {
     } finally {
       this.syncing = false;
       await this.refreshOutbox();
+    }
+  }
+
+  // ---- spending ----------------------------------------------------------
+
+  /** Fetches what sorting has cost so far. Needs a connection; the server keeps the count. */
+  async loadUsage(): Promise<void> {
+    if (!this.config) return;
+    this.usageNote = null;
+    try {
+      const res = await fetch(`${this.config.api}/v1/usage`, {
+        headers: { authorization: `Bearer ${this.config.token}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new Error(`the server said ${res.status}`);
+      this.usage = (await res.json()) as UsageReport;
+    } catch (err) {
+      this.usageNote = navigator.onLine ? `Could not load spending: ${err instanceof Error ? err.message : String(err)}` : 'Spending is shown when you are online.';
     }
   }
 

@@ -4,6 +4,8 @@ import { parseCapture, splitPrefix } from '../../../shared/src/parse';
 import type { Settings } from '../../../shared/src/settings';
 import { localDate } from '../../../shared/src/time';
 import type { ListId } from '../../../shared/src/types';
+import { capitalizeFirst } from '../../../shared/src/text';
+import { recordTokens } from '../usage';
 import type { Sorter } from './llm';
 import { parseSortOutput, type SortedItem } from './output';
 
@@ -120,7 +122,13 @@ async function finish(db: D1Database, id: string, status: 'sorted' | 'failed' | 
 export function settle(items: SortedItem[], fixedList: ListId | null, deviceRemindAt: string | null, settings: Settings): (SortedItem & { unsorted: boolean })[] {
   const sections = settings.grocerySections;
   const fallbackSection = sections.includes('Other') ? 'Other' : (sections[sections.length - 1] ?? 'Other');
-  const settled = items.map((item) => {
+  const settled = items.map((raw) => {
+    // Every item starts with a capital, whatever the model wrote.
+    const item = {
+      ...raw,
+      title: capitalizeFirst(raw.title),
+      grocery: raw.grocery ? { ...raw.grocery, displayName: capitalizeFirst(raw.grocery.displayName) } : null,
+    };
     // A prefix always wins over the model.
     if (fixedList) {
       const grocery =
@@ -277,8 +285,10 @@ export async function sortCapture(deps: SortDeps, captureId: string, timeoutMs: 
 
   let sorted: SortedItem[];
   try {
-    const raw = await deps.sorter({ text: rest, capturedAt, settings, fixedList, deviceRemindAt }, timeoutMs);
-    sorted = parseSortOutput(raw, settings);
+    const answer = await deps.sorter({ text: rest, capturedAt, settings, fixedList, deviceRemindAt }, timeoutMs);
+    // Count the tokens before validating: a useless answer still cost money.
+    await recordTokens(db, settings, now, answer.tokens);
+    sorted = parseSortOutput(answer.output, settings);
     if (!sorted.length) throw new Error('model returned no items');
   } catch (err) {
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 300);
