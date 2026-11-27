@@ -80,7 +80,7 @@ async function device(name) {
     failed = true;
     console.error(`[${name}] page error:`, e.message);
   });
-  const box = page.getByLabel('Capture');
+  const box = page.getByLabel('Capture', { exact: true });
   const tab = (t) => page.getByRole('navigation').getByRole('button', { name: t }).click();
   const capture = async (text) => {
     await box.fill(text);
@@ -227,6 +227,7 @@ try {
   await phone.status.click();
   await phone.page.getByLabel('Sort captures automatically').uncheck();
   await phone.page.keyboard.press('Escape');
+  await phone.page.getByRole('dialog', { name: 'Unforget' }).waitFor({ state: 'hidden' });
   await phone.synced();
   const before = modelCalls.length;
   await phone.capture('sorteer dit niet');
@@ -236,6 +237,7 @@ try {
   await phone.status.click();
   await phone.page.getByLabel('Sort captures automatically').check();
   await phone.page.keyboard.press('Escape');
+  await phone.page.getByRole('dialog', { name: 'Unforget' }).waitFor({ state: 'hidden' });
   await phone.synced();
 
   step('share target: shared text is saved as a capture');

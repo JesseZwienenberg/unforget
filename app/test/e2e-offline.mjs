@@ -51,14 +51,14 @@ try {
 
   await context.setOffline(true);
   await page.reload();
-  await page.getByLabel('Capture').waitFor({ timeout: 15000 });
-  await page.getByLabel('Capture').fill('p offline note');
-  await page.getByLabel('Capture').press('Enter');
+  await page.getByLabel('Capture', { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByLabel('Capture', { exact: true }).fill('p offline note');
+  await page.getByLabel('Capture', { exact: true }).press('Enter');
   await page.getByText('Saved → Personal · offline note').waitFor({ timeout: 5000 });
 
   // The setup link and share target add a fragment or query; the shell must still load.
   await page.goto(`${url}?source=share#other`);
-  await page.getByLabel('Capture').waitFor({ timeout: 15000 });
+  await page.getByLabel('Capture', { exact: true }).waitFor({ timeout: 15000 });
 
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
   console.log('e2e offline: ok');
