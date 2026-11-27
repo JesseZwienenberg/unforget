@@ -205,8 +205,8 @@ describe('POST /v1/sync', () => {
     expect(db.raw.prepare('SELECT count(*) AS c FROM items').get()).toEqual({ c: 0 });
   });
 
-  it('health reports the m1 schema', async () => {
+  it('health reports the current schema', async () => {
     const res = await worker.fetch(new Request('https://w.example/health'), env());
-    expect(await res.json()).toMatchObject({ ok: true, schema: 'm1' });
+    expect(await res.json()).toMatchObject({ ok: true, schema: 'm2' });
   });
 });

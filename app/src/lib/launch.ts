@@ -33,10 +33,16 @@ export function parseShare(search: string): string | null {
   return kept.length ? kept.join(' ') : null;
 }
 
+/** `?item=<id>`: the app was opened by tapping a reminder notification. */
+export function parseOpenItem(search: string): string | null {
+  const id = new URLSearchParams(search).get('item');
+  return id && /^[0-9a-f-]{36}$/i.test(id) ? id.toLowerCase() : null;
+}
+
 /** The URL with setup and share details removed, so a reload or a screenshot never repeats or leaks them. */
 export function cleanUrl(href: string): string {
   const url = new URL(href);
-  for (const name of Object.values(SHARE_PARAMS)) url.searchParams.delete(name);
+  for (const name of [...Object.values(SHARE_PARAMS), 'item']) url.searchParams.delete(name);
   if (parseSetupLink(url.hash)) url.hash = '';
   return url.pathname + url.search + url.hash;
 }

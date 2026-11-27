@@ -2,17 +2,18 @@
 
 ## Done
 
-- **M0 – Bootstrap** (accepted 26 Nov 2026): repo, CI, deploys, installable offline placeholder, Worker health endpoint. Phone test passed.
+- **M0 – Bootstrap** (accepted 26 Nov 2026).
+- **M1 – Capture** (accepted 27 Nov 2026). Phone test passed. One finding: the keyboard does not open by itself on a cold start (it does when returning to the app); handled with tap-anywhere-to-type, see DECISIONS.
 
 ## In progress
 
-**M1 – Capture**: built and deployed; waiting for Jesse's phone test.
+**M2 – Reminders**: built and deployed; waiting for Jesse's phone tests.
 
 What exists:
-- `shared/`: types, settings defaults, device parser (prefixes + relative times, NL/EN), time-zone helpers, last-write-wins merge, sync validation.
-- Worker: `POST /v1/sync` (LWW upserts in SQL, `rev` cursor, paging), migration `0002_sync.sql` (captures, items, settings, sync_state).
-- App: capture box docked at the bottom, tabs (Today / Work / Personal / Groceries), toast with tap-to-fix and Undo, edit sheet, IndexedDB via Dexie behind `Storage`, outbox + sync, setup link, share target, export, sync status + More sheet.
-- Tests: 178 unit tests; two Chrome end-to-end tests (offline shell; full capture → sync → second device flow against a local Worker).
+- Worker: Web Push (VAPID, Urgency high, TTL 12 h), `push_subscriptions` (migration 0003), per-minute cron, claim-then-send with `notifiedAt`, late and stale handling, `POST /v1/items/:id/action` for notification buttons, push key/subscribe/unsubscribe/test endpoints.
+- App: turn-on-notifications banner and More section with test button, service worker push + notification buttons (Done, Snooze 1h) + tap-to-open, snooze sheet, "not scheduled yet: offline" warning, tap anywhere to focus the box.
+- Docs: `docs/PHONE.md` (Samsung checklist).
+- Tests: 218 unit tests (reminder selection, idempotency, late, snooze presets across DST, push encryption round trip); Chrome e2e covers snooze sheet, warnings, action endpoint and the push handler.
 
 Live addresses:
 - App: https://jessezwienenberg.github.io/unforget/
@@ -20,12 +21,12 @@ Live addresses:
 
 ## Exact next step
 
-1. Jesse runs the M1 phone test (setup link, offline capture, laptop, share, export) and reports back, in particular whether the keyboard opens by itself when the app starts.
-2. Fix whatever he reports.
-3. On his OK: mark M1 done here and start M2 (reminders). First M2 tasks: pick a Web Push library that runs on Workers (WebCrypto), add `push_subscriptions` migration, subscribe flow in the app, per-minute cron with `notifiedAt`, notification buttons in the service worker.
+1. Jesse does the Samsung checklist and the three M2 phone tests ("over 2 min test" with the phone locked; 30 minutes ahead with the phone idle; overnight at 07:45) and reports back.
+2. Fix whatever he reports (delivery problems: start from the "Send a test notification" message).
+3. On his OK: mark M2 done here and start M3 (LLM sorting). First M3 tasks: Jesse adds the `ANTHROPIC_API_KEY` secret (SETUP.md step 5); design the prompt and tool schema for `claude-haiku-5-5`; `llm_usage` migration; sorting inside sync with a timeout; cron retries; eval set and workflow.
 
 ## Known issues
 
-- Whether Android opens the keyboard automatically on launch is untested (cannot be checked off-device).
+- Real push delivery (through Google's push service to the phone) has only been tested up to the encrypted request; the phone tests are the first full run.
 - An already-installed app picks up the share target only after Chrome refreshes the install (up to a day) or after reinstalling.
-- No "not scheduled yet: offline" warning yet: it arrives with reminders in M2. Reminder times are stored and shown, but nothing notifies until M2.
+- Without a prefix everything lands in Personal until M3.

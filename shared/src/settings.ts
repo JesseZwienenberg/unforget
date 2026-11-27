@@ -12,7 +12,9 @@ export interface Settings {
   digest: { time: string; days: number[] };
   /** Days until an untouched item is archived; null = never. */
   fading: { personalDays: number | null; workDays: number | null; overdueDays: number | null; groceriesDays: number | null };
+  /** Two buttons on each reminder notification: 'done' or 'snooze:<preset>'. */
   notificationButtons: [string, string];
+  /** Presets offered in the snooze sheet: '<n>m', '<n>h', 'tonight', 'tomorrow-morning'. */
   snoozePresets: string[];
   prefixes: Record<ListId, string>;
   grocerySections: string[];
@@ -24,7 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   vagueTimes: { morning: '07:45', afternoon: '13:00', evening: '20:00', weekend: '10:00' },
   digest: { time: '08:00', days: [0, 1, 2, 3, 4, 5, 6] },
   fading: { personalDays: 14, workDays: 30, overdueDays: 7, groceriesDays: null },
-  notificationButtons: ['done', 'snooze-1h'],
+  notificationButtons: ['done', 'snooze:1h'],
   snoozePresets: ['1h', 'tonight', 'tomorrow-morning'],
   prefixes: { work: 'w', personal: 'p', groceries: 'g' },
   grocerySections: [

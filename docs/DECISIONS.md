@@ -63,6 +63,29 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 - Settings already sync as one last-write-wins document with all defaults from the spec; the screen to edit them comes in M4.
 - Frontend is about 62 KB gzipped, most of it Dexie (required by the spec) and Svelte; the 80 KB CI gate stays.
 
+## M2
+
+- Android/Chrome does not open the keyboard on a cold start without a tap (it does when returning to the running app). Closest alternative, agreed with Jesse: a tap anywhere on empty space focuses the box. A truly automatic keyboard needs the native app (v3).
+- Web Push library: `@block65/webcrypto-web-push` (WebCrypto only, one small dependency). A test decrypts its output independently (RFC 8291) and verifies the VAPID signature with our key format, since real delivery can't be tested off-device.
+- Push is sent with `Urgency: high` and a TTL of 12 hours: wakes the phone at once; if the phone is off, the push service keeps it half a day, after which a reminder is no longer useful as a notification (it shows as overdue in the app).
+- A reminder is claimed before it is sent: `notified_at` is set by an UPDATE guarded with "still not notified, same time, still open", then pushed. Overlapping runs (cron plus a sync-triggered send) can't both win the row, so nothing is sent twice.
+- If no device accepts the push, the claim is released and the next minute tries again; `notified_at` only stays set after a real delivery to at least one device. A reminder never disappears silently.
+- A reminder counts as late when it goes out more than 90 seconds after its time; the notification then reads "Late · was due …".
+- Reminders more than 24 hours overdue are not pushed (they are marked handled and show under Overdue): avoids a burst of stale notifications after a long outage or a first-time subscribe.
+- With no subscribed device, fresh reminders are left unclaimed and go out, marked late, as soon as a device turns notifications on.
+- A sync that brings in an already-due reminder triggers delivery immediately (`waitUntil`) instead of waiting for the next cron minute.
+- At most about 40 pushes per cron run: stays within the free plan's limit on outgoing requests; the rest go out the next minute.
+- Notification buttons are action ids `done` and `snooze:<preset>`; presets are `<n>m`, `<n>h`, `tonight`, `tomorrow-morning`, resolved by one shared function on both the server (notification button) and the app (snooze sheet).
+- "Tonight" after the evening time has passed means tomorrow evening: a snooze must never land in the past.
+- A notification button calls `POST /v1/items/:id/action` from the service worker, which reads the token from IndexedDB directly (no Dexie in the worker). If the call fails, the notification is shown again with the reason: it must not vanish on a failed "Done".
+- The server applies button actions with its own clock as `updatedAt`; devices pick the change up on their next sync.
+- Tapping the notification body opens the app with the snooze sheet (presets, pick a time, Done); the item id travels as `?item=` and is removed from the address.
+- The app re-registers its push subscription on every start when permission is already granted, and replaces a subscription made with a different key: the server's copy stays valid without the user doing anything.
+- "Send a test notification" in the More sheet reports how many devices accepted it and the push service's error if not: the main tool for diagnosing delivery on a phone.
+- "not scheduled yet: offline" is shown in the toast and on the row while an item with a reminder has not been accepted by the server and the app is offline or failing to sync; not during the split second of a normal sync.
+- The cron and VAPID subject are in `wrangler.jsonc`; the smoke test now fails if the VAPID secrets are missing on the Worker.
+- The service worker's push handler is tested in real Chrome by delivering a push through DevTools; the encrypted hop through Google's push service can only be tested on the phone.
+
 ## Later
 
 Nothing yet.

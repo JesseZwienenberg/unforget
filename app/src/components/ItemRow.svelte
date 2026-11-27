@@ -10,6 +10,7 @@
   const remindLate = $derived(Boolean(item.remindAt && item.remindAt < app.now.toISOString()));
   const due = $derived(item.dueAt ? dueDate(item.dueAt, app.timeZone) : null);
   const dueLate = $derived(Boolean(due && due < today));
+  const warning = $derived(app.notScheduled(item));
   const label = $derived(item.list === 'groceries' ? groceryLabel(item) : item.title);
 </script>
 
@@ -19,6 +20,7 @@
   </button>
   <button type="button" class="body" onclick={() => app.edit(item.id)}>
     <span class="title">{label}</span>
+    {#if warning}<span class="warning">⚠ {warning}</span>{/if}
     {#if item.remindAt || due || showList || item.unsorted}
       <span class="meta">
         {#if item.remindAt}<span class:late={remindLate}>⏰ {formatWhen(item.remindAt, app.timeZone, app.now)}</span>{/if}
@@ -78,6 +80,11 @@
     gap: 0 0.75rem;
     font-size: 0.82rem;
     color: var(--muted);
+  }
+  .warning {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--warn);
   }
   .late {
     color: var(--bad);

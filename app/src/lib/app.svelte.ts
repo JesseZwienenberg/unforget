@@ -1,10 +1,12 @@
 // The app's state and every action the screens can take. Screens stay dumb.
 import { createCapture } from '$shared/capture';
 import { DEFAULT_SETTINGS, type Settings } from '$shared/settings';
+import { resolveSnooze } from '$shared/snooze';
 import { formatWhen } from '$shared/time';
 import { LIST_NAMES, type CaptureSource, type Item, type ListId } from '$shared/types';
 import { downloadJson } from './export';
-import { cleanUrl, parseSetupLink, parseShare } from './launch';
+import { cleanUrl, parseOpenItem, parseSetupLink, parseShare } from './launch';
+import { currentPushState, sendTest, subscribe, type PushState } from './push';
 import { registerServiceWorker, requestPersistentStorage, type ShellStatus } from './pwa';
 import { DexieStorage } from './storage/dexie';
 import type { Config, Storage } from './storage/types';
@@ -16,6 +18,8 @@ export type SyncState = 'unconfigured' | 'idle' | 'syncing' | 'offline' | 'unaut
 export interface Toast {
   key: number;
   text: string;
+  /** A second line that must not be missed, e.g. "not scheduled yet: offline". */
+  warning?: string | null;
   /** Tapping the toast opens this item for a quick fix. */
   itemId: string | null;
   undo: (() => void) | null;
@@ -45,6 +49,17 @@ class App {
   updateReady = $state(false);
   apiHost = $state<string | null>(null);
 
+  /** Items the server has not accepted yet: their reminders are not scheduled. */
+  unsynced = $state.raw<ReadonlySet<string>>(new Set());
+  pushState = $state<PushState>('unsupported');
+  pushBusy = $state(false);
+  pushNote = $state<string | null>(null);
+  /** The item whose snooze sheet is open (after tapping a notification). */
+  snoozingId = $state<string | null>(null);
+  /** Set by the capture box, so a tap anywhere can open the keyboard. */
+  focusBox: () => void = () => {};
+  private wantedItemId: string | null = null;
+
   private storage: Storage = new DexieStorage();
   private config: Config | null = null;
   private started: Promise<void> | null = null;
@@ -55,6 +70,20 @@ class App {
 
   get timeZone(): string {
     return this.settings.timeZone;
+  }
+
+  get snoozing(): Item | null {
+    return this.items.find((i) => i.id === this.snoozingId && i.status !== 'archived') ?? null;
+  }
+
+  /** Why a reminder is not scheduled on the server yet, or null when it is (or there is none). */
+  notScheduled(item: Item): string | null {
+    if (!item.remindAt || item.status !== 'open' || item.notifiedAt) return null;
+    if (this.syncState === 'unconfigured') return 'not scheduled: this device is not connected';
+    if (!this.unsynced.has(item.id)) return null;
+    if (this.syncState === 'offline') return 'not scheduled yet: offline';
+    if (this.syncState === 'unauthorized' || this.syncState === 'error') return 'not scheduled yet: sync problem';
+    return null; // a sync is on its way
   }
 
   get editing(): Item | null {
@@ -71,7 +100,8 @@ class App {
     // The one-time setup link: keep the token locally, then scrub it from the address bar.
     const setup = parseSetupLink(location.hash);
     const shared = parseShare(location.search);
-    if (setup || shared) history.replaceState(null, '', cleanUrl(location.href));
+    this.wantedItemId = parseOpenItem(location.search);
+    if (setup || shared || this.wantedItemId) history.replaceState(null, '', cleanUrl(location.href));
 
     if (setup) await this.storage.saveConfig(setup);
     const [config, settings, items] = await Promise.all([
@@ -83,9 +113,10 @@ class App {
     this.apiHost = config ? new URL(config.api).host : null;
     if (settings) this.settings = settings.value;
     this.items = items;
-    this.waiting = await this.storage.outboxSize();
-    this.syncState = config ? 'idle' : 'unconfigured';
+    await this.refreshOutbox();
+    this.syncState = config ? (navigator.onLine ? 'idle' : 'offline') : 'unconfigured';
     this.ready = true;
+    this.openWanted();
 
     if (setup) this.showToast({ text: 'Connected. Syncing…', itemId: null, undo: null });
     if (shared) void this.capture(shared, 'share');
@@ -115,8 +146,106 @@ class App {
     void registerServiceWorker(
       (s) => (this.shell = s),
       () => (this.updateReady = true),
-    );
+    ).then(() => this.startPush());
     void requestPersistentStorage();
+
+    // The service worker speaks up when a notification was tapped or a button on it was used.
+    navigator.serviceWorker?.addEventListener('message', (event) => {
+      const data = event.data as { type?: string; itemId?: string | null } | null;
+      if (data?.type === 'sync') this.requestSync();
+      if (data?.type === 'open-item') {
+        this.wantedItemId = data.itemId ?? null;
+        if (!data.itemId) this.tab = 'today';
+        this.openWanted();
+        this.requestSync();
+      }
+    });
+  }
+
+  // ---- notifications -----------------------------------------------------
+
+  private async startPush(): Promise<void> {
+    this.pushState = await currentPushState();
+    // Permission already given: (re)register quietly, so the server always has a working subscription.
+    if (this.config && Notification.permission === 'granted' && this.pushState !== 'unsupported') {
+      try {
+        await subscribe(this.config);
+        this.pushState = 'on';
+      } catch (err) {
+        console.warn('push refresh failed', err);
+      }
+    }
+  }
+
+  /** Must be called from a tap: the browser only asks for permission then. */
+  async enableNotifications(): Promise<void> {
+    if (!this.config) {
+      this.pushNote = 'Connect this device first (open your setup link).';
+      return;
+    }
+    this.pushBusy = true;
+    this.pushNote = null;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        this.pushState = permission === 'denied' ? 'blocked' : 'off';
+        return;
+      }
+      await subscribe(this.config);
+      this.pushState = 'on';
+      this.pushNote = 'Notifications are on for this device.';
+    } catch (err) {
+      this.pushNote = `Could not turn notifications on: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      this.pushBusy = false;
+    }
+  }
+
+  async testNotification(): Promise<void> {
+    if (!this.config) return;
+    this.pushBusy = true;
+    this.pushNote = null;
+    try {
+      const r = await sendTest(this.config);
+      this.pushNote =
+        r.devices === 0
+          ? 'No device has notifications turned on.'
+          : r.delivered === r.devices
+            ? `Sent to ${r.devices} ${r.devices === 1 ? 'device' : 'devices'}. It should appear within a few seconds.`
+            : `Sent to ${r.delivered} of ${r.devices} devices. Problem: ${r.errors[0] ?? 'unknown'}`;
+    } catch (err) {
+      this.pushNote = `Test failed: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      this.pushBusy = false;
+    }
+  }
+
+  /** Opens the snooze sheet for the item a notification was about, once that item is on this device. */
+  private openWanted(): void {
+    if (!this.wantedItemId) return;
+    const item = this.items.find((i) => i.id === this.wantedItemId);
+    if (!item) return; // not here yet: tried again after the next sync
+    this.wantedItemId = null;
+    if (item.status === 'open') {
+      this.dismissToast();
+      this.snoozingId = item.id;
+    }
+  }
+
+  /** Snoozes to a preset ('1h', 'tonight', …) or to an exact time. */
+  async snooze(id: string, to: string | Date): Promise<void> {
+    const until = typeof to === 'string' ? resolveSnooze(to, new Date(), this.settings) : to;
+    this.snoozingId = null;
+    if (!until) return;
+    const item = await this.change(id, { remindAt: until.toISOString(), notifiedAt: null, status: 'open' });
+    if (item?.remindAt) {
+      this.showToast({ text: `Snoozed → ⏰ ${formatWhen(item.remindAt, this.timeZone, this.now)} · ${item.title}`, warning: this.offlineWarning(), itemId: null, undo: null });
+    }
+  }
+
+  private offlineWarning(): string | null {
+    if (!this.config) return 'not scheduled: this device is not connected';
+    return navigator.onLine ? null : 'not scheduled yet: offline';
   }
 
   // ---- capture -----------------------------------------------------------
@@ -131,6 +260,7 @@ class App {
     this.now = typedAt;
     this.showToast({
       text: this.savedText(item),
+      warning: item.remindAt ? this.offlineWarning() : null,
       itemId: item.id,
       undo: () => void this.undoCapture(capture.id),
     });
@@ -172,6 +302,7 @@ class App {
   }
 
   async setDone(id: string, done: boolean): Promise<void> {
+    if (this.snoozingId === id) this.snoozingId = null;
     const item = await this.change(id, { status: done ? 'done' : 'open' });
     if (item && done) this.showToast({ text: `Done · ${item.title}`, itemId: null, undo: () => void this.setDone(id, false) });
     else if (item) this.dismissToast();
@@ -215,8 +346,14 @@ class App {
 
   // ---- sync --------------------------------------------------------------
 
+  private async refreshOutbox(): Promise<void> {
+    const [size, ids] = await Promise.all([this.storage.outboxSize(), this.storage.unsyncedItemIds()]);
+    this.waiting = size;
+    this.unsynced = new Set(ids);
+  }
+
   private afterWrite(): void {
-    void this.storage.outboxSize().then((n) => (this.waiting = n));
+    void this.refreshOutbox();
     this.requestSync();
   }
 
@@ -245,6 +382,7 @@ class App {
           const [items, settings] = await Promise.all([this.storage.loadItems(), this.storage.loadSettings()]);
           this.items = items;
           if (settings) this.settings = settings.value;
+          this.openWanted();
         }
       } while (this.syncAgain);
       this.syncState = 'idle';
@@ -260,7 +398,7 @@ class App {
       }
     } finally {
       this.syncing = false;
-      this.waiting = await this.storage.outboxSize();
+      await this.refreshOutbox();
     }
   }
 

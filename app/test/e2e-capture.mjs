@@ -87,6 +87,7 @@ try {
   await phone.page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await phone.capture('over 10 minuten oven uit');
   await phone.page.getByText(/^Saved → Personal · ⏰ \d\d:\d\d · oven uit/).waitFor({ timeout: 5000 });
+  await phone.page.locator('.toast').getByText('not scheduled yet: offline').waitFor({ timeout: 5000 });
   if ((await phone.box.inputValue()) !== '') throw new Error('box was not cleared');
   if (!(await phone.box.evaluate((el) => el === document.activeElement))) throw new Error('box lost focus after saving');
   await phone.capture('G Ketchup');
@@ -94,6 +95,7 @@ try {
   await phone.capture('w kwartaalcijfers nakijken');
   await phone.status.getByText('Offline · 6 waiting').waitFor({ timeout: 5000 });
   await see(phone.page, 'oven uit'); // has a reminder today, so it is on Today
+  await phone.page.locator('li').getByText('not scheduled yet: offline').waitFor({ timeout: 5000 });
 
   step('phone: still there after closing and reopening offline');
   await phone.page.reload();
@@ -107,6 +109,7 @@ try {
   await phone.context.setOffline(false);
   await phone.page.evaluate(() => window.dispatchEvent(new Event('online')));
   await phone.synced();
+  if (await phone.page.getByText('not scheduled yet').count()) throw new Error('"not scheduled" warning stayed after syncing');
 
   step('laptop: sees what the phone captured');
   const laptop = await device('laptop');
@@ -154,6 +157,28 @@ try {
   await laptop.tab('Personal');
   await see(laptop.page, 'taart bestellen voor zaterdag');
   if (await laptop.page.getByText('vergissing').count()) throw new Error('undone capture reached the laptop');
+
+  step('notification tap: opens the snooze sheet for that item');
+  const server = (body) =>
+    fetch(`${API}/v1/sync`, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}` }, body: JSON.stringify(body) }).then((r) => r.json());
+  const oven = (await server({ since: 0 })).items.find((i) => i.title === 'oven uit');
+  await phone.page.goto(`${APP}?item=${oven.id}`);
+  const sheet = phone.page.getByRole('dialog', { name: 'Snooze' });
+  await sheet.getByText('oven uit').waitFor({ timeout: 10000 });
+  if (phone.page.url() !== APP) throw new Error(`item parameter still in URL: ${phone.page.url()}`);
+  await sheet.getByRole('button', { name: /Tomorrow morning/ }).click();
+  await phone.page.getByText(/^Snoozed → ⏰ tomorrow 07:45 · oven uit/).waitFor({ timeout: 5000 });
+  await phone.synced();
+  const snoozed = (await server({ since: 0 })).items.find((i) => i.id === oven.id);
+  if (!/T0[56]:45:00\.000Z$/.test(snoozed.remindAt)) throw new Error(`snooze did not reach the server: ${snoozed.remindAt}`);
+
+  step('notification button: Done on the server shows up in the app');
+  const acted = await fetch(`${API}/v1/items/${oven.id}/action`, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}` }, body: JSON.stringify({ action: 'done' }) });
+  if (acted.status !== 200) throw new Error(`action endpoint said ${acted.status}`);
+  await phone.page.reload();
+  await phone.synced();
+  await phone.tab('Personal');
+  await gone(phone.page, 'oven uit');
 
   step('share target: shared text is saved as a capture');
   await phone.page.goto(`${APP}?share_title=Recept&share_text=${encodeURIComponent('Recept https://example.com/pasta')}`);

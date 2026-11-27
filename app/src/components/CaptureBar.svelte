@@ -6,7 +6,10 @@
   let input: HTMLInputElement;
 
   // Land in the box. Android decides whether the keyboard opens without a tap.
-  onMount(() => input.focus());
+  onMount(() => {
+    app.focusBox = () => input.focus();
+    input.focus();
+  });
 
   function submit(event: SubmitEvent) {
     event.preventDefault();

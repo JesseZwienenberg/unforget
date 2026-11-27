@@ -5,8 +5,8 @@ The app splits it into items, files them under Work, Personal or Groceries, and 
 time it finds into a reminder. Nothing needs organising: items with a time remind you,
 items without one quietly fade away.
 
-**Status:** M1 (capture). Capturing, lists, sync between devices, share target and export
-work; reminders are stored but not yet delivered (M2). See [docs/PROGRESS.md](docs/PROGRESS.md).
+**Status:** M2 (reminders). Capturing, lists, sync, share target, export and reminder
+notifications work; smart sorting comes in M3. See [docs/PROGRESS.md](docs/PROGRESS.md).
 
 - App: https://jessezwienenberg.github.io/unforget/
 - Full specification: [docs/SPEC.md](docs/SPEC.md)
@@ -39,6 +39,14 @@ network. Changed rows wait in an outbox and are sent to `POST /v1/sync`, which a
 (last write wins per row) and returns everything changed since the device's cursor. The
 raw text of every capture is kept forever.
 
+## Reminders
+
+A cron runs on the Worker every minute. It claims each due reminder (setting `notifiedAt`,
+so nothing is ever sent twice) and sends a Web Push to every subscribed device. The
+notification has two buttons, Done and Snooze 1h, which work without opening the app;
+tapping the notification opens a snooze sheet. A reminder that reaches the server after its
+time is sent at once, marked late. Phone settings that matter: [docs/PHONE.md](docs/PHONE.md).
+
 ## Setup
 
 One-time, browser only: [docs/SETUP.md](docs/SETUP.md).
@@ -58,7 +66,8 @@ The app stores the token on the device and removes it from the address bar.
 - "in 10 min", "over een kwartier", "in an hour", "over 2 uur" set a reminder time.
 - Tap the toast to fix the list, time or title; Undo removes the capture.
 - Share text or a link from any Android app to Unforget to capture it.
-- The dot in the top right shows sync status; tap it for Sync now and Export.
+- The dot in the top right shows sync status; tap it for Sync now, notifications and Export.
+- Tap anywhere on empty space to bring up the keyboard.
 
 ## Rotating the token
 

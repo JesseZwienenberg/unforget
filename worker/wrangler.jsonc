@@ -7,9 +7,13 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
+  // One trigger, every minute (UTC): due reminders now; digest, LLM retries and fading later.
+  "triggers": { "crons": ["* * * * *"] },
   "vars": {
     // Browser origins allowed by CORS, comma-separated. Add more for a native app later.
-    "ALLOWED_ORIGINS": "https://jessezwienenberg.github.io"
+    "ALLOWED_ORIGINS": "https://jessezwienenberg.github.io",
+    // Contact address sent to push services (required by the Web Push standard).
+    "VAPID_SUBJECT": "https://jessezwienenberg.github.io/unforget/"
   },
   "d1_databases": [
     {

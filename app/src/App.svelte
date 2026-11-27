@@ -5,6 +5,7 @@
   import ItemRow from './components/ItemRow.svelte';
   import More from './components/More.svelte';
   import Sheet from './components/Sheet.svelte';
+  import SnoozeForm from './components/SnoozeForm.svelte';
   import { app, type Tab } from './lib/app.svelte';
   import { groceryLabel, groceryView, listItems, todayView } from './lib/views';
 
@@ -21,6 +22,11 @@
   const todayCount = $derived(today.overdue.length + today.today.length);
   const groceries = $derived(groceryView(app.items, app.settings));
   const list = $derived(app.tab === 'work' || app.tab === 'personal' ? listItems(app.items, app.tab) : []);
+
+  // A tap on empty space opens the keyboard: Android will not open it by itself on a cold start.
+  function focusOnEmptyTap(event: MouseEvent) {
+    if (!(event.target as Element).closest('button, input, a, label')) app.focusBox();
+  }
 
   // Short status next to the title. Says nothing when all is well.
   const status = $derived.by(() => {
@@ -49,7 +55,14 @@
     </button>
   </header>
 
-  <main>
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+  <main onclick={focusOnEmptyTap}>
+    {#if app.ready && app.syncState !== 'unconfigured' && app.pushState === 'off'}
+      <div class="banner">
+        <span>Reminders can't reach you yet.</span>
+        <button type="button" onclick={() => app.enableNotifications()} disabled={app.pushBusy}>Turn on notifications</button>
+      </div>
+    {/if}
     {#if !app.ready}
       <!-- local data loads in a few milliseconds; show nothing rather than flash -->
     {:else if app.tab === 'today'}
@@ -98,10 +111,15 @@
         <div class="toast" role="status">
           {#if app.toast.itemId}
             <button type="button" class="toast-text" onclick={() => app.toast?.itemId && app.edit(app.toast.itemId)}>
-              {app.toast.text}<small>Tap to fix</small>
+              {app.toast.text}
+              {#if app.toast.warning}<strong>⚠ {app.toast.warning}</strong>{/if}
+              <small>Tap to fix</small>
             </button>
           {:else}
-            <span class="toast-text">{app.toast.text}</span>
+            <span class="toast-text">
+              {app.toast.text}
+              {#if app.toast.warning}<strong>⚠ {app.toast.warning}</strong>{/if}
+            </span>
           {/if}
           {#if app.toast.undo}
             <button type="button" class="undo" onpointerdown={(e) => e.preventDefault()} onclick={() => app.toast?.undo?.()}>Undo</button>
@@ -125,6 +143,12 @@
 <Sheet open={app.editing !== null} title="Fix item" onclose={() => (app.editingId = null)}>
   {#if app.editing}
     {#key app.editing.id}<EditForm item={app.editing} />{/key}
+  {/if}
+</Sheet>
+
+<Sheet open={app.snoozing !== null} title="Snooze" onclose={() => (app.snoozingId = null)}>
+  {#if app.snoozing}
+    {#key app.snoozing.id}<SnoozeForm item={app.snoozing} />{/key}
   {/if}
 </Sheet>
 
@@ -340,6 +364,32 @@
     font: inherit;
     text-align: left;
     overflow-wrap: anywhere;
+  }
+  .toast-text strong {
+    display: block;
+    font-size: 0.85rem;
+  }
+  .banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0.5rem 0.75rem;
+    padding: 0.6rem 0.6rem 0.6rem 0.9rem;
+    border-radius: 0.8rem;
+    border: 1.5px solid var(--warn);
+    font-size: 0.92rem;
+  }
+  .banner button {
+    flex: none;
+    min-height: 2.75rem;
+    padding: 0 0.9rem;
+    border-radius: 0.6rem;
+    border: 0;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: inherit;
+    font-weight: 600;
   }
   .toast-text small {
     display: block;

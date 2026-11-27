@@ -8,7 +8,7 @@ const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'
 let failed = false;
 
 try {
-  const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
+  const context = await browser.newContext({ viewport: { width: 412, height: 915 }, permissions: ['notifications'] });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -19,6 +19,32 @@ try {
 
   const cacheNames = await page.evaluate(() => caches.keys());
   if (!cacheNames.every((n) => n.startsWith('unforget-'))) throw new Error(`unexpected cache names: ${cacheNames}`);
+
+  // A push message becomes a notification with the two action buttons.
+  const cdp = await context.newCDPSession(page);
+  const registrationId = await new Promise((resolve) => {
+    cdp.on('ServiceWorker.workerRegistrationUpdated', (e) => e.registrations[0] && resolve(e.registrations[0].registrationId));
+    void cdp.send('ServiceWorker.enable');
+  });
+  const push = {
+    kind: 'reminder',
+    title: 'oven uit',
+    body: '⏰ 14:13 · Personal',
+    tag: 'item-1',
+    itemId: '1',
+    actions: [
+      { action: 'done', title: 'Done' },
+      { action: 'snooze:1h', title: 'Snooze 1h' },
+    ],
+  };
+  await cdp.send('ServiceWorker.deliverPushMessage', { origin: 'http://localhost:4173', registrationId, data: JSON.stringify(push) });
+  await page.waitForFunction(async () => (await (await navigator.serviceWorker.ready).getNotifications()).length === 1, null, { timeout: 5000 });
+  const shown = await page.evaluate(async () => {
+    const [n] = await (await navigator.serviceWorker.ready).getNotifications();
+    return { title: n.title, body: n.body, tag: n.tag, itemId: n.data.itemId, actions: n.actions.map((a) => a.action) };
+  });
+  const expected = { title: 'oven uit', body: '⏰ 14:13 · Personal', tag: 'item-1', itemId: '1', actions: ['done', 'snooze:1h'] };
+  if (JSON.stringify(shown) !== JSON.stringify(expected)) throw new Error(`notification was ${JSON.stringify(shown)}`);
 
   await context.setOffline(true);
   await page.reload();

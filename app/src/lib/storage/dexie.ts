@@ -96,6 +96,10 @@ export class DexieStorage implements Storage {
     return captures + items + (settings?.dirty === 1 ? 1 : 0);
   }
 
+  async unsyncedItemIds(): Promise<string[]> {
+    return this.db.items.where('dirty').equals(1).primaryKeys();
+  }
+
   async cursor(): Promise<number> {
     return (await this.get<number>('cursor')) ?? 0;
   }

@@ -42,6 +42,24 @@
   </section>
 
   <section>
+    <h3>Reminders</h3>
+    {#if app.pushState === 'on'}
+      <p>Notifications are on for this device.</p>
+      <button type="button" onclick={() => app.testNotification()} disabled={app.pushBusy}>Send a test notification</button>
+    {:else if app.pushState === 'off'}
+      <p>Reminders arrive as notifications. Turn them on for this device.</p>
+      <button type="button" class="primary" onclick={() => app.enableNotifications()} disabled={app.pushBusy}>Turn on notifications</button>
+    {:else if app.pushState === 'blocked'}
+      <p>
+        Notifications are blocked for this app. On Android: long-press the Unforget icon → App info (ⓘ) → Notifications → allow. Then reopen the app.
+      </p>
+    {:else}
+      <p class="muted">This browser cannot show notifications for this app.</p>
+    {/if}
+    {#if app.pushNote}<p class="muted note" role="status">{app.pushNote}</p>{/if}
+  </section>
+
+  <section>
     <h3>Your data</h3>
     <p class="muted">Downloads every capture and item on this device, including done and deleted ones.</p>
     <button type="button" onclick={() => app.exportEverything()}>Export everything (JSON)</button>
@@ -73,6 +91,9 @@
   .muted {
     color: var(--muted);
     font-size: 0.9rem;
+  }
+  .note {
+    margin-top: 0.6rem;
   }
   .small {
     font-size: 0.8rem;

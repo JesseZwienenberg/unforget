@@ -44,6 +44,8 @@ export interface Storage {
   /** Up to `limit` rows per kind that still need to reach the server. */
   outbox(limit: number): Promise<Outbox>;
   outboxSize(): Promise<number>;
+  /** Ids of items the server has not accepted yet. */
+  unsyncedItemIds(): Promise<string[]>;
   cursor(): Promise<number>;
   /**
    * Finishes one sync round in one transaction: marks what was sent as delivered
