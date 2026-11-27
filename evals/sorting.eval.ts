@@ -72,6 +72,9 @@ it('sorting eval set against the real model', { timeout: 600_000 }, async () => 
     results.push(...(await Promise.all(CASES.slice(i, i + PARALLEL).map((c) => run(c, sorter)))));
   }
 
+  // One line per case in the log: the raw answers are how test fixtures get recorded.
+  for (const r of results) if (r.raw) console.log(`RAW ${JSON.stringify({ text: r.text, output: r.raw })}`);
+
   const passed = results.filter((r) => r.ok).length;
   const times = results.map((r) => r.ms).sort((a, b) => a - b);
   const lines = [
