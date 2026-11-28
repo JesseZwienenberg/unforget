@@ -8,7 +8,11 @@
   // Land in the box. Android decides whether the keyboard opens without a tap.
   onMount(() => {
     app.focusBox = () => input.focus();
+    app.restoreText = (value) => {
+      if (!text) text = value;
+    };
     input.focus();
+    app.bootMs = Math.round(performance.now());
   });
 
   function submit(event: SubmitEvent) {

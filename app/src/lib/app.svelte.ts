@@ -11,7 +11,6 @@ import { downloadJson } from './export';
 import { cleanUrl, parseOpenItem, parseSetupLink, parseShare } from './launch';
 import { currentPushState, sendTest, subscribe, type PushState } from './push';
 import { registerServiceWorker, requestPersistentStorage, type ShellStatus } from './pwa';
-import { DexieStorage } from './storage/dexie';
 import type { Config, Storage } from './storage/types';
 import { OfflineError, runSync, UnauthorizedError } from './sync';
 import { groceryAfterEdit } from './views';
@@ -82,7 +81,17 @@ class App {
   focusBox: () => void = () => {};
   private wantedItemId: string | null = null;
 
-  private storage: Storage = new DexieStorage();
+  /** Set when this device cannot store data at all; shown as a banner. */
+  storageError = $state<string | null>(null);
+  /** Milliseconds from launch until the box could be typed in, and until local data was on screen. */
+  bootMs = $state<number | null>(null);
+  dataMs = $state<number | null>(null);
+  /** Set by the capture box: puts text back when saving it failed. */
+  restoreText: (text: string) => void = () => {};
+
+  // The database code (Dexie) is the largest part of the app. It is loaded right
+  // after the first paint instead of before it, so the box appears sooner.
+  private storage!: Storage;
   private config: Config | null = null;
   private started: Promise<void> | null = null;
   private syncing = false;
@@ -119,6 +128,17 @@ class App {
   }
 
   private async init(): Promise<void> {
+    try {
+      this.storage = new (await import('./storage/dexie')).DexieStorage();
+      await this.load();
+    } catch (err) {
+      console.error(err);
+      this.storageError = 'This browser will not let Unforget store data, so nothing can be saved. Check that you are not in a private or incognito window and that the phone has free space.';
+      throw err;
+    }
+  }
+
+  private async load(): Promise<void> {
     // The one-time setup link: keep the token locally, then scrub it from the address bar.
     const setup = parseSetupLink(location.hash);
     const shared = parseShare(location.search);
@@ -138,6 +158,7 @@ class App {
     await this.refreshOutbox();
     this.syncState = config ? (navigator.onLine ? 'idle' : 'offline') : 'unconfigured';
     this.ready = true;
+    this.dataMs = Math.round(performance.now());
     this.openWanted();
 
     if (setup) this.showToast({ text: 'Connected. Syncing…', itemId: null, undo: null });
@@ -276,7 +297,12 @@ class App {
   async capture(text: string, source: CaptureSource): Promise<void> {
     const typedAt = new Date(); // before any waiting: relative times count from here
     if (!text.trim()) return;
-    await this.start();
+    try {
+      await this.start();
+    } catch {
+      this.restoreText(text);
+      return;
+    }
     const { capture, item } = createCapture(text, source, typedAt, this.settings, newId);
     // Without a prefix the sorter decides the list. If it can answer right away, wait
     // for it instead of showing the item under Personal first.
@@ -295,7 +321,17 @@ class App {
       captureId: capture.id,
       undo: () => void this.undoCapture(capture.id),
     });
-    await this.storage.saveCapture(capture, [item]);
+    try {
+      await this.storage.saveCapture(capture, [item]);
+    } catch (err) {
+      // Never pretend it was saved: take it off the screen and hand the text back.
+      console.error(err);
+      this.items = this.items.filter((i) => i.id !== item.id);
+      this.stopWaiting(item.id);
+      this.restoreText(text);
+      this.showToast({ text: 'Not saved', warning: 'this device could not store it. Your text is back in the box.', itemId: null, undo: null });
+      return;
+    }
     this.afterWrite();
   }
 

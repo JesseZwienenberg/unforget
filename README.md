@@ -5,8 +5,8 @@ The app splits it into items, files them under Work, Personal or Groceries, and 
 time it finds into a reminder. Nothing needs organising: items with a time remind you,
 items without one quietly fade away.
 
-**Status:** M4 (self-cleaning, digest, settings). Everything in the v1 feature list is
-built; M5 is polish. See [docs/PROGRESS.md](docs/PROGRESS.md).
+**Status:** v1 feature-complete (M0 to M5 built). See [docs/PROGRESS.md](docs/PROGRESS.md)
+for what has been confirmed on the phone.
 
 - App: https://jessezwienenberg.github.io/unforget/
 - Full specification: [docs/SPEC.md](docs/SPEC.md)
@@ -96,6 +96,9 @@ The app stores the token on the device and removes it from the address bar.
 - Share text or a link from any Android app to Unforget to capture it.
 - The dot in the top right shows sync status; tap it for Sync now, notifications and Export.
 - Tap anywhere on empty space to bring up the keyboard.
+- Swipe sideways, or tap the tabs above the box, to move between Today, Work, Personal and
+  Groceries.
+- Tap the circle to mark something done; tap the text to change it.
 
 ## Rotating the token
 
@@ -121,6 +124,30 @@ device. The one deploy-time setting is the list of allowed browser origins:
 The app shows the running total: tap the dot in the top right → **Spending** (today, this
 month, all time). It is calculated from the tokens each capture used, at the prices in
 `shared/src/cost.ts`; the Anthropic Console shows the real bill and the remaining credit.
+
+## Performance
+
+Budget: typing within about a second of tapping the icon, and under 80 KB of JavaScript
+(gzipped). Before the box appears the app loads about 36 KB; the database code and the
+sheets (another 38 KB) load right after. CI measures start-up on every push with the CPU
+slowed four times: about 240 ms. On the phone, the More sheet shows "Ready to type in … ms"
+for the current launch.
+
+## If something is wrong
+
+| What you see | What to do |
+| --- | --- |
+| "Not connected" | Open your setup link in Chrome on that device. |
+| "Reconnect needed" | The token changed. Open a fresh setup link. |
+| "Offline · 3 waiting" | Nothing is lost. It syncs when the connection is back. |
+| "Sync problem" | Tap the dot: the message under **Sync** says what the server answered. |
+| A reminder did not arrive | Tap the dot → **Send a test notification**, then follow [docs/PHONE.md](docs/PHONE.md). |
+| An item is under the wrong list | Tap it and fix it; a manual fix is never overwritten. Tell Claude the text so it joins the eval set. |
+| An item vanished after two weeks | It faded. Settings → **Archive** → tap it to restore. |
+| The Deploy run is red | Open it in the Actions tab and give Claude the red line. |
+| A new version does not show | Close the app and open it again (twice after a deploy). |
+
+Everything you ever typed is in the export: Settings → **Export everything (JSON)**.
 
 ## Development
 

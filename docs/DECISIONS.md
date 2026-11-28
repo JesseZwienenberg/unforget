@@ -139,6 +139,14 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 - The More sheet now holds status (sync, notifications, spending) and a button to the settings screen; the sorting switch and Export moved into settings.
 - Frontend grew to about 71 KB gzipped (budget 80). M5 should load the settings and More sheets on demand.
 
+## M5
+
+- Swiping sideways on the list area moves between tabs (asked by Jesse). A swipe must be at least 56 px, under 0.7 s and at most half as tall as it is wide, so scrolling never changes tab; it stops at the first and last tab. The tab buttons remain, so swiping is never the only way.
+- The database code (Dexie, about 32 KB gzipped) and the four sheets (edit, snooze, More, settings) are loaded after the first paint instead of before it. What must load before the box appears went from about 71 KB to about 36 KB gzipped; the total is about 74 KB (budget 80). All chunks are precached, so this changes nothing offline.
+- Performance, measured in CI on every push: with everything cached and the CPU slowed 4x (standing in for a phone), the capture box is on screen about 240 ms after launch. The test fails above 2.5 s. On the phone itself, the More sheet shows "Ready to type in … ms" for that launch.
+- If the browser refuses to store data (private window, storage disabled, disk full) the app shows a red banner and a failed capture puts the text back in the box: it never shows "Saved" for something it could not save.
+- Accessibility pass: every button and field has an accessible name (checked by a browser test on the main screen and in each sheet), sheets are native dialogs (focus trap, Esc and back gesture), the toast is a status region, tap targets are at least 44 px, colours meet AA contrast in light and dark, and animations are off under "reduce motion".
+
 ## Later
 
 Nothing yet.

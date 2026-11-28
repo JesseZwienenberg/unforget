@@ -113,6 +113,7 @@
   </section>
 
   <p class="muted small">
+    {#if app.bootMs !== null}Ready to type in {app.bootMs} ms{#if app.dataMs !== null}, lists in {app.dataMs} ms{/if} ·{/if}
     Build {__BUILD_ID__} ·
     {app.shell === 'ready' ? 'opens offline' : app.shell === 'installing' ? 'preparing offline use…' : 'offline use unavailable'}
   </p>

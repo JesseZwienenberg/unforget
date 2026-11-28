@@ -1,16 +1,14 @@
 <script lang="ts">
   import { LIST_NAMES } from '$shared/types';
   import CaptureBar from './components/CaptureBar.svelte';
-  import EditForm from './components/EditForm.svelte';
   import ItemRow from './components/ItemRow.svelte';
-  import More from './components/More.svelte';
-  import SettingsForm from './components/SettingsForm.svelte';
   import Sheet from './components/Sheet.svelte';
-  import SnoozeForm from './components/SnoozeForm.svelte';
   import { app, type Tab } from './lib/app.svelte';
+  import { neighbour, swipeStep } from './lib/swipe';
   import { groceryLabel, groceryView, listItems, todayView } from './lib/views';
 
-  void app.start();
+  // A failure to start is shown as a banner (see storageError); nothing more to do here.
+  app.start().catch(() => undefined);
 
   const TABS: { id: Tab; name: string }[] = [
     { id: 'today', name: 'Today' },
@@ -26,6 +24,31 @@
   const todayCount = $derived(today.overdue.length + today.today.length);
   const groceries = $derived(groceryView(settled, app.settings));
   const list = $derived(app.tab === 'work' || app.tab === 'personal' ? listItems(settled, app.tab) : []);
+
+  // Sideways swipe between tabs. `slide` is the direction the new tab comes in from.
+  let slide = $state(0);
+  let touch: { x: number; y: number; at: number } | null = null;
+
+  function go(tab: Tab) {
+    const from = TABS.findIndex((t) => t.id === app.tab);
+    const to = TABS.findIndex((t) => t.id === tab);
+    if (from === to) return;
+    slide = to > from ? 1 : -1;
+    app.tab = tab;
+  }
+
+  function touchStart(event: TouchEvent) {
+    const t = event.touches.length === 1 ? event.touches[0] : undefined;
+    touch = t ? { x: t.clientX, y: t.clientY, at: event.timeStamp } : null;
+  }
+
+  function touchEnd(event: TouchEvent) {
+    const t = event.changedTouches[0];
+    if (!touch || !t) return;
+    const step = swipeStep(t.clientX - touch.x, t.clientY - touch.y, event.timeStamp - touch.at);
+    touch = null;
+    if (step) go(neighbour(TABS.map((x) => x.id), app.tab, step));
+  }
 
   // A tap on empty space opens the keyboard: Android will not open it by itself on a cold start.
   function focusOnEmptyTap(event: MouseEvent) {
@@ -60,13 +83,18 @@
   </header>
 
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-  <main onclick={focusOnEmptyTap}>
+  <main onclick={focusOnEmptyTap} ontouchstart={touchStart} ontouchend={touchEnd} ontouchcancel={() => (touch = null)}>
     {#if app.ready && app.syncState !== 'unconfigured' && app.pushState === 'off'}
       <div class="banner">
         <span>Reminders can't reach you yet.</span>
         <button type="button" onclick={() => app.enableNotifications()} disabled={app.pushBusy}>Turn on notifications</button>
       </div>
     {/if}
+    {#if app.storageError}
+      <div class="banner bad" role="alert"><span>{app.storageError}</span></div>
+    {/if}
+    {#key app.tab}
+    <div class="view" style:--from={slide}>
     {#if !app.ready}
       <!-- local data loads in a few milliseconds; show nothing rather than flash -->
     {:else if app.tab === 'today'}
@@ -107,6 +135,8 @@
         <p class="empty">Nothing here. Start a line with “{app.settings.prefixes[app.tab]} ” to file it under {LIST_NAMES[app.tab]}.</p>
       {/if}
     {/if}
+    </div>
+    {/key}
   </main>
 
   <div class="dock">
@@ -134,7 +164,7 @@
 
     <nav aria-label="Lists">
       {#each TABS as tab (tab.id)}
-        <button type="button" aria-current={app.tab === tab.id ? 'page' : undefined} onpointerdown={(e) => e.preventDefault()} onclick={() => (app.tab = tab.id)}>
+        <button type="button" aria-current={app.tab === tab.id ? 'page' : undefined} onpointerdown={(e) => e.preventDefault()} onclick={() => go(tab.id)}>
           {tab.name}{#if tab.id === 'today' && todayCount}<b>{todayCount}</b>{/if}
         </button>
       {/each}
@@ -144,24 +174,32 @@
   </div>
 </div>
 
+<!-- The sheets' contents are loaded when first opened, so they don't slow down the start.
+     They are precached by the service worker, so this works offline too. -->
 <Sheet open={app.editing !== null} title="Fix item" onclose={() => (app.editingId = null)}>
   {#if app.editing}
-    {#key app.editing.id}<EditForm item={app.editing} />{/key}
+    {@const item = app.editing}
+    {#await import('./components/EditForm.svelte') then { default: EditForm }}
+      {#key item.id}<EditForm {item} />{/key}
+    {/await}
   {/if}
 </Sheet>
 
 <Sheet open={app.snoozing !== null} title="Snooze" onclose={() => (app.snoozingId = null)}>
   {#if app.snoozing}
-    {#key app.snoozing.id}<SnoozeForm item={app.snoozing} />{/key}
+    {@const item = app.snoozing}
+    {#await import('./components/SnoozeForm.svelte') then { default: SnoozeForm }}
+      {#key item.id}<SnoozeForm {item} />{/key}
+    {/await}
   {/if}
 </Sheet>
 
 <Sheet open={app.moreOpen} title="Unforget" onclose={() => (app.moreOpen = false)}>
-  <More />
+  {#await import('./components/More.svelte') then { default: More }}<More />{/await}
 </Sheet>
 
 <Sheet open={app.settingsOpen} title="Settings" onclose={() => (app.settingsOpen = false)}>
-  <SettingsForm />
+  {#await import('./components/SettingsForm.svelte') then { default: SettingsForm }}<SettingsForm />{/await}
 </Sheet>
 
 <style>
@@ -271,6 +309,9 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    /* Up/down scrolls; sideways is ours (swipe between tabs). */
+    touch-action: pan-y;
     padding-bottom: 1rem;
   }
   ul {
@@ -388,6 +429,20 @@
     border: 1.5px solid var(--warn);
     font-size: 0.92rem;
   }
+  .banner.bad {
+    border-color: var(--bad);
+    color: var(--bad);
+    font-weight: 600;
+  }
+  .view {
+    animation: slide 0.16s ease-out;
+  }
+  @keyframes slide {
+    from {
+      transform: translateX(calc(var(--from) * 1.5rem));
+      opacity: 0.4;
+    }
+  }
   .banner button {
     flex: none;
     min-height: 2.75rem;
@@ -415,6 +470,7 @@
     font-weight: 650;
   }
   @media (prefers-reduced-motion: reduce) {
+    .view,
     .toast,
     .status.busy i {
       animation: none;
