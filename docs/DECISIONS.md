@@ -122,6 +122,23 @@ One line each: the decision, then why. Newest at the bottom of each milestone.
 
 - Bug fix (27 Nov): renaming a sorted grocery did not change the list, because grocery lines showed the sorter's `displayName` instead of the title. Lines now show the title; renaming also updates `displayName` and the name duplicates are matched on (the lowercased new title), keeps section and quantity, and moving an item off the grocery list drops its grocery details.
 
+## M4
+
+- Fading rules live in one pure function (`shared/src/fading.ts`): an item with a time fades `overdueDays` after that time (the later of reminder and deadline; a date-only deadline lasts to the end of its local day); an item whose time is still ahead never fades; undated Personal/Work items fade after their own period; groceries only if a period is set. The clock always counts from the last touch if that is later.
+- Fading is decided in code over all open items, once a night, not in SQL: the rules need the time zone and settings, and a single user's open items are few.
+- The nightly clean-up and the digest each claim their day in the `meta` table before running (`fade_day`, `digest_day`): the cron fires every minute, a claim makes each job run exactly once, and a missed minute just means it runs a minute later.
+- Clean-up runs at or after 03:00 local; the digest at or after its configured time, for up to 3 hours: a late cron still delivers, but nobody gets a "morning" digest at noon.
+- If the digest reaches no device, its claim is released so the next minute retries. With nothing to say, or no subscribed device, the day is simply skipped.
+- Digest content: reminders today, due today, overdue, and items fading within 2 days that are not already listed. At most 6 lines; the title carries the counts. Tapping it opens Today.
+- "Today" and "overdue" are computed by the same shared function (`shared/src/today.ts`) for the app's Today tab and the digest, so they can't disagree.
+- Archive: faded items are listed in the settings screen (latest 100) with one-tap Restore, which reopens the item with a fresh clock. Search in the archive stays in v2.
+- "Clean up now" button (`POST /v1/cleanup`) runs the nightly job on demand: makes the fading test possible without waiting for 03:00, and is harmless otherwise.
+- Fading periods accept 0 (fade at the next clean-up) and decimals: useful for testing; empty means never.
+- Settings screen edits a private copy and saves with one button, after validation with plain-language problems. Stored settings are sanitised field by field on every read (`withDefaults`), on the device and on the server, so a malformed or older settings document can never break either.
+- Grocery sections are edited as text, one per line: reordering is cut and paste, no drag-and-drop code.
+- The More sheet now holds status (sync, notifications, spending) and a button to the settings screen; the sorting switch and Export moved into settings.
+- Frontend grew to about 71 KB gzipped (budget 80). M5 should load the settings and More sheets on demand.
+
 ## Later
 
 Nothing yet.

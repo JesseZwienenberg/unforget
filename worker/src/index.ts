@@ -2,6 +2,7 @@ import { applyAction } from './actions';
 import { isAuthorized } from './auth';
 import type { Env } from './env';
 import { corsHeaders, json, withHeaders } from './http';
+import { digestIfDue, nightlyIfDue, runFading } from './maintenance';
 import { createSender, deleteSubscription, listSubscriptions, pushConfigured, saveSubscription, sendToAll } from './push';
 import { deliverDueReminders } from './reminders';
 import { loadSettings } from './settings';
@@ -160,6 +161,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext | undefin
   if (pathname === '/v1/ping' && method === 'GET') return json({ ok: true });
   if (pathname === '/v1/sync' && method === 'POST') return handleSync(request, env, ctx);
 
+  // "Clean up now" in the settings screen: the nightly job, on demand.
+  if (pathname === '/v1/cleanup' && method === 'POST') return json({ archived: await runFading(env.DB, await loadSettings(env.DB), new Date()) });
   if (pathname === '/v1/usage' && method === 'GET') return json(await usageReport(env.DB, await loadSettings(env.DB), new Date()));
 
   if (pathname === '/v1/push/key' && method === 'GET') {
@@ -189,6 +192,14 @@ export async function runCron(env: Env, now: Date): Promise<void> {
     const tally = await sortPending(deps, CRON_SORT_MAX, CRON_SORT_MS);
     if (tally.sorted || tally.failed || tally.capped) console.log('sorting', JSON.stringify(tally));
   }
+  // The two once-a-day jobs. Each is one cheap lookup on every other minute.
+  const settings = await loadSettings(env.DB);
+  if (pushConfigured(env)) {
+    const digest = await digestIfDue(env.DB, createSender(env), settings, now);
+    if (digest !== 'not-due' && digest !== 'already-sent') console.log('digest', digest);
+  }
+  const archived = await nightlyIfDue(env.DB, settings, now);
+  if (archived !== null) console.log('nightly clean-up archived', archived);
 }
 
 export default {

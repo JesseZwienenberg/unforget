@@ -4,6 +4,7 @@
   import EditForm from './components/EditForm.svelte';
   import ItemRow from './components/ItemRow.svelte';
   import More from './components/More.svelte';
+  import SettingsForm from './components/SettingsForm.svelte';
   import Sheet from './components/Sheet.svelte';
   import SnoozeForm from './components/SnoozeForm.svelte';
   import { app, type Tab } from './lib/app.svelte';
@@ -157,6 +158,10 @@
 
 <Sheet open={app.moreOpen} title="Unforget" onclose={() => (app.moreOpen = false)}>
   <More />
+</Sheet>
+
+<Sheet open={app.settingsOpen} title="Settings" onclose={() => (app.settingsOpen = false)}>
+  <SettingsForm />
 </Sheet>
 
 <style>

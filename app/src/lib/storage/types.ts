@@ -35,6 +35,8 @@ export interface Storage {
 
   /** Everything that can appear on screen: not deleted, not archived. */
   loadItems(): Promise<Item[]>;
+  /** Faded items, most recently archived first. */
+  loadArchived(limit: number): Promise<Item[]>;
   getCapture(id: string): Promise<Capture | null>;
   /** Saves a capture with its items and queues them for sync. One transaction. */
   saveCapture(capture: Capture, items: Item[]): Promise<void>;

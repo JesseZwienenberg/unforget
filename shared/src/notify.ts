@@ -5,7 +5,7 @@ import { formatWhen } from './time';
 import { LIST_NAMES, type Item } from './types';
 
 export interface PushPayload {
-  kind: 'reminder' | 'test';
+  kind: 'reminder' | 'test' | 'digest';
   title: string;
   body: string;
   /** Same tag = the newer notification replaces the older one. */

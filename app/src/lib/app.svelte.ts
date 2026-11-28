@@ -3,7 +3,7 @@ import { createCapture } from '$shared/capture';
 import type { UsageReport } from '$shared/cost';
 import { splitPrefix } from '$shared/parse';
 import { capitalizeFirst } from '$shared/text';
-import { DEFAULT_SETTINGS, type Settings } from '$shared/settings';
+import { DEFAULT_SETTINGS, settingsProblems, withDefaults, type Settings } from '$shared/settings';
 import { resolveSnooze } from '$shared/snooze';
 import { formatWhen } from '$shared/time';
 import { LIST_NAMES, type CaptureSource, type Item, type ListId } from '$shared/types';
@@ -55,6 +55,10 @@ class App {
   toast = $state<Toast | null>(null);
   editingId = $state<string | null>(null);
   moreOpen = $state(false);
+  settingsOpen = $state(false);
+  /** Faded items, shown in the settings screen. Loaded when that screen opens. */
+  archived = $state.raw<Item[]>([]);
+  cleanupNote = $state<string | null>(null);
   shell = $state<ShellStatus>('installing');
   updateReady = $state(false);
   apiHost = $state<string | null>(null);
@@ -478,7 +482,55 @@ class App {
     }
   }
 
+  // ---- archive -----------------------------------------------------------
+
+  async loadArchived(): Promise<void> {
+    this.archived = await this.storage.loadArchived(100);
+  }
+
+  /** Brings a faded item back, with a fresh fading clock. */
+  async restore(item: Item): Promise<void> {
+    this.archived = this.archived.filter((i) => i.id !== item.id);
+    if (!this.items.some((i) => i.id === item.id)) this.items = [...this.items, item];
+    await this.change(item.id, { status: 'open' });
+    this.showToast({ text: `Restored → ${LIST_NAMES[item.list]} · ${item.title}`, itemId: null, undo: null });
+  }
+
+  /** Runs the nightly clean-up now, on the server, then pulls the result. */
+  async cleanupNow(): Promise<void> {
+    if (!this.config) return;
+    this.cleanupNote = 'Cleaning up…';
+    try {
+      // Make sure the server has this device's latest items and settings first.
+      await runSync(this.storage, this.config);
+      const res = await fetch(`${this.config.api}/v1/cleanup`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${this.config.token}` },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) throw new Error(`the server said ${res.status}`);
+      const { archived } = (await res.json()) as { archived: number };
+      await runSync(this.storage, this.config);
+      this.items = await this.storage.loadItems();
+      await this.loadArchived();
+      await this.refreshOutbox();
+      this.cleanupNote = archived === 0 ? 'Nothing to clean up.' : `Archived ${archived} ${archived === 1 ? 'item' : 'items'}.`;
+    } catch (err) {
+      this.cleanupNote = navigator.onLine ? `Clean-up failed: ${err instanceof Error ? err.message : String(err)}` : 'Clean-up needs a connection.';
+    }
+  }
+
   // ---- settings ----------------------------------------------------------
+
+  /** Saves the settings screen. Returns the problems to fix, or an empty list when saved. */
+  async saveSettings(draft: Settings): Promise<string[]> {
+    const problems = settingsProblems(draft);
+    if (problems.length) return problems;
+    await this.updateSettings(() => withDefaults(draft));
+    this.settingsOpen = false;
+    this.showToast({ text: 'Settings saved', itemId: null, undo: null });
+    return [];
+  }
 
   /** Changes settings on this device and queues them for sync to the server and other devices. */
   async updateSettings(change: (current: Settings) => Settings): Promise<void> {

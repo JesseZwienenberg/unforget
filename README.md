@@ -5,9 +5,8 @@ The app splits it into items, files them under Work, Personal or Groceries, and 
 time it finds into a reminder. Nothing needs organising: items with a time remind you,
 items without one quietly fade away.
 
-**Status:** M3 (smart sorting). Capturing, sync, reminders and automatic sorting work;
-self-cleaning, the morning digest and the settings screen come in M4. See
-[docs/PROGRESS.md](docs/PROGRESS.md).
+**Status:** M4 (self-cleaning, digest, settings). Everything in the v1 feature list is
+built; M5 is polish. See [docs/PROGRESS.md](docs/PROGRESS.md).
 
 - App: https://jessezwienenberg.github.io/unforget/
 - Full specification: [docs/SPEC.md](docs/SPEC.md)
@@ -62,6 +61,18 @@ To tune the prompt (`worker/src/sort/prompt.ts`): run the **Eval sorting** workf
 Actions tab. It runs `evals/cases.ts` against the real API and lists mismatches in the run
 summary.
 
+## Self-cleaning and the morning digest
+
+Nothing lives forever untouched. Every night at 03:00 local time the Worker archives items
+whose time is up: undated Personal items after 14 days, undated Work items after 30, and
+overdue items 7 days after their time. Groceries stay until ticked off. Archived is never
+deleted: the settings screen lists the archive, and a tap restores an item with a fresh
+clock. Snoozing, editing or re-adding an item also restarts its clock.
+
+At the digest time (default 08:00) one notification lists today's reminders and deadlines,
+overdue items and anything that fades within two days. It is skipped when there is nothing
+to say.
+
 ## Setup
 
 One-time, browser only: [docs/SETUP.md](docs/SETUP.md).
@@ -93,9 +104,11 @@ at the bottom of [docs/SETUP.md](docs/SETUP.md).
 
 ## Changing settings
 
-App settings (time zone, vague times, digest, fading, prefixes, grocery sections) will be
-edited in the app's Settings screen from M4. The one deploy-time setting is the list of
-allowed browser origins: `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`.
+Tap the dot in the top right → **Open settings**. Everything there (vague times, time zone,
+digest time and days, fading periods, notification buttons, snooze options, prefixes,
+grocery sections, sorting and its daily limit) is saved on the server and synced to every
+device. The one deploy-time setting is the list of allowed browser origins:
+`ALLOWED_ORIGINS` in `worker/wrangler.jsonc`.
 
 ## Costs
 

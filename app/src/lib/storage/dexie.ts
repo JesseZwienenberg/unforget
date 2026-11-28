@@ -58,6 +58,15 @@ export class DexieStorage implements Storage {
     return rows.filter((r) => r.deletedAt === null).map(strip);
   }
 
+  async loadArchived(limit: number): Promise<Item[]> {
+    const rows = await this.db.items.where('status').equals('archived').toArray();
+    return rows
+      .filter((r) => r.deletedAt === null)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, limit)
+      .map(strip);
+  }
+
   async getCapture(id: string): Promise<Capture | null> {
     const row = await this.db.captures.get(id);
     return row ? strip(row) : null;

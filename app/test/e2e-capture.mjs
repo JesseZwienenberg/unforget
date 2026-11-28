@@ -88,8 +88,18 @@ async function device(name) {
     await box.press('Enter');
   };
   const status = page.getByLabel('Sync status and more');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  const openSettings = async () => {
+    await status.click();
+    await page.getByRole('button', { name: 'Open settings' }).click();
+    await settings.getByRole('button', { name: 'Save settings' }).waitFor();
+  };
+  const saveSettings = async () => {
+    await settings.getByRole('button', { name: 'Save settings' }).click();
+    await settings.waitFor({ state: 'hidden' });
+  };
   const synced = () => page.waitForSelector('button.status[data-sync="idle"][data-waiting="0"]', { timeout: 15000 });
-  return { context, page, box, tab, capture, status, synced };
+  return { context, page, box, tab, capture, status, synced, settings, openSettings, saveSettings };
 }
 
 const see = (page, text) => page.getByText(text, { exact: true }).first().waitFor({ timeout: 10000 });
@@ -167,7 +177,8 @@ try {
   const dialog = phone.page.getByRole('dialog', { name: 'Fix item' });
   await dialog.getByLabel('Title').fill('taart bestellen voor zaterdag');
   await dialog.getByText('Personal', { exact: true }).click();
-  await dialog.getByLabel('Deadline').fill('2026-12-05');
+  // A deadline a month ahead, whenever this test runs.
+  await dialog.getByLabel('Deadline').fill(new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10));
   await dialog.getByRole('button', { name: 'Save' }).click();
   await phone.tab('Personal');
   await see(phone.page, 'Taart bestellen voor zaterdag');
@@ -255,21 +266,63 @@ try {
   await phone.page.getByRole('dialog', { name: 'Unforget' }).waitFor({ state: 'hidden' });
 
   step('smart sorting: switched off, the model is not called');
-  await phone.status.click();
-  await phone.page.getByLabel('Sort captures automatically').uncheck();
-  await phone.page.keyboard.press('Escape');
-  await phone.page.getByRole('dialog', { name: 'Unforget' }).waitFor({ state: 'hidden' });
+  await phone.openSettings();
+  await phone.settings.getByLabel('Sort captures automatically').uncheck();
+  await phone.saveSettings();
   await phone.synced();
   const before = modelCalls.length;
   await phone.capture('sorteer dit niet');
   await phone.synced();
   await phone.page.waitForTimeout(500);
   if (modelCalls.length !== before) throw new Error('model was called while sorting is off');
-  await phone.status.click();
-  await phone.page.getByLabel('Sort captures automatically').check();
-  await phone.page.keyboard.press('Escape');
-  await phone.page.getByRole('dialog', { name: 'Unforget' }).waitFor({ state: 'hidden' });
+  await phone.openSettings();
+  await phone.settings.getByLabel('Sort captures automatically').check();
+  await phone.saveSettings();
   await phone.synced();
+
+  step('settings: invalid values are explained, not saved');
+  await phone.openSettings();
+  await phone.settings.getByLabel('Work', { exact: true }).fill('p');
+  await phone.settings.getByRole('button', { name: 'Save settings' }).click();
+  await phone.settings.getByText('The three prefixes must be different.').waitFor({ timeout: 5000 });
+
+  step('settings: a changed prefix and grocery order work at once and reach the laptop');
+  await phone.settings.getByLabel('Work', { exact: true }).fill('j');
+  await phone.settings.getByLabel('Grocery sections').fill('Bread & bakery\nDairy & eggs\nOther');
+  await phone.saveSettings();
+  await phone.page.getByText('Settings saved').waitFor({ timeout: 5000 });
+  await phone.capture('j kantoor bellen');
+  await phone.page.getByText('Saved → Work · Kantoor bellen').waitFor({ timeout: 5000 });
+  await phone.synced();
+  await phone.tab('Groceries');
+  const headings = await phone.page.locator('main h2').allInnerTexts();
+  if (headings.slice(0, 2).join('|').toLowerCase() !== 'bread & bakery|dairy & eggs') throw new Error(`grocery sections out of order: ${headings}`);
+  await laptop.page.reload();
+  await laptop.synced();
+  await laptop.capture('j vanaf de laptop');
+  await laptop.page.getByText('Saved → Work · Vanaf de laptop').waitFor({ timeout: 5000 });
+  await laptop.synced();
+
+  step('self-cleaning: with fading at 0 days, clean-up archives undated Personal items; restore brings one back');
+  await phone.openSettings();
+  await phone.settings.getByLabel('Personal, no date').fill('0');
+  await phone.saveSettings();
+  await phone.synced();
+  await phone.openSettings();
+  await phone.settings.getByRole('button', { name: 'Clean up now' }).click();
+  await phone.settings.getByText(/^Archived \d+ items?\.$/).waitFor({ timeout: 15000 });
+  await phone.settings.locator('.archive').getByText('Fiets naar de maker').waitFor({ timeout: 5000 });
+  if (await phone.settings.locator('.archive').getByText('Kantoor bellen').count()) throw new Error('a Work item was archived by the Personal rule');
+  await phone.settings.locator('.archive button', { hasText: 'Fiets naar de maker' }).click();
+  await phone.page.getByText('Restored → Personal · Fiets naar de maker').waitFor({ timeout: 5000 });
+  await phone.settings.getByLabel('Personal, no date').fill('14');
+  await phone.saveSettings();
+  await phone.synced();
+  await phone.tab('Personal');
+  await phone.page.locator('li', { hasText: 'Fiets naar de maker' }).waitFor({ timeout: 5000 });
+  await phone.page.locator('main li', { hasText: 'Taart bestellen voor zaterdag' }).waitFor({ timeout: 5000 }); // has a deadline ahead: never fades early
+  await phone.tab('Groceries');
+  await phone.page.getByLabel(/^Mark done: Melk/).waitFor({ timeout: 5000 }); // groceries never fade
 
   step('share target: shared text is saved as a capture');
   await phone.page.goto(`${APP}?share_title=Recept&share_text=${encodeURIComponent('Recept https://example.com/pasta')}`);
@@ -280,10 +333,10 @@ try {
   if ((await phone.page.getByText('Recept https://example.com/pasta', { exact: true }).count()) !== 1) throw new Error('reload repeated the shared capture');
 
   step('export: downloads everything, including raw text of the undone capture');
-  await phone.status.click();
+  await phone.openSettings();
   const [download] = await Promise.all([phone.page.waitForEvent('download'), phone.page.getByRole('button', { name: 'Export everything (JSON)' }).click()]);
   const data = JSON.parse(readFileSync(await download.path(), 'utf8'));
-  if (data.captures.length !== 10) throw new Error(`export has ${data.captures.length} captures`);
+  if (data.captures.length !== 12) throw new Error(`export has ${data.captures.length} captures`);
   if (!data.captures.some((c) => c.text === 'p vergissing' && c.deletedAt)) throw new Error('export lost the undone capture');
   if (!data.captures.some((c) => c.text === 'G Ketchup')) throw new Error('raw capture text was changed');
 
