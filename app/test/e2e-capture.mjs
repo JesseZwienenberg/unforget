@@ -244,6 +244,8 @@ try {
   await rename.getByLabel('Title').fill('volkoren brood');
   await rename.getByRole('button', { name: 'Save' }).click();
   await phone.page.getByLabel('Mark done: Volkoren brood × 2').waitFor({ timeout: 5000 });
+  // Wait until the rename has really reached the server before reloading.
+  for (let i = 0; i < 50 && !(await server({ since: 0 })).items.some((x) => x.title === 'Volkoren brood'); i++) await phone.page.waitForTimeout(200);
   await phone.synced();
   await phone.page.reload();
   await phone.synced();
